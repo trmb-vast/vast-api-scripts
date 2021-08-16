@@ -1,0 +1,3 @@
+[distutils.setup_keywords]
+use_katversion = katversion.build:setuptools_entry
+

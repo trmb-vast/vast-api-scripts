@@ -1,0 +1,11 @@
+katversion/__init__.py,sha256=cd7_44M0lEvuNWOqpqBVHo-w5USD6eXBq297y6HpClo,982
+katversion/build.py,sha256=8mqMj2cLiLu2Ezj1P5k7MHNnqDpqAcfXm_tS8NZFO8o,6028
+katversion/version.py,sha256=Q552iTD-fyL10EDALA2_JtdRMnUyrsInmzVBuvPy8P8,12055
+katversion-1.1.data/scripts/kat-get-version.py,sha256=0fZr4MVgqTCs7V2xRAqI1enJ3zWDBZZnY2iR2wt0U3E,1451
+katversion-1.1.dist-info/LICENSE.txt,sha256=PMs4lkQGXkcZ_AYRZip8P8BU9EExASn6i-ZzWUGfMN0,1544
+katversion-1.1.dist-info/METADATA,sha256=fKKUKjaC3wL6vDSQMIUbMp4qTkB_wqr-Zb5V5tNmHtQ,3858
+katversion-1.1.dist-info/WHEEL,sha256=kGT74LWyRUZrL4VgLh6_g12IeVl_9u9ZVhadrgXZUEY,110
+katversion-1.1.dist-info/entry_points.txt,sha256=PmqKTLLvgi3P8dpSRfZdp2zgZhF6ntunGm-8FlA7NXs,79
+katversion-1.1.dist-info/pbr.json,sha256=ajk7GO5PDzIocuspiijVNuEWbl3OgRGBKzwkk_9VGkU,46
+katversion-1.1.dist-info/top_level.txt,sha256=SK3ogA4CFuIMsJ9xAGsWxmwDifFItFLQ2XKjYCvQ7Bc,11
+katversion-1.1.dist-info/RECORD,,
