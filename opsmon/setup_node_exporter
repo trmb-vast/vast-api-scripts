@@ -1,0 +1,55 @@
+#!/bin/bash
+
+## These are a cut-n-paste script to setup prometheus/node_exporter
+## the client-agent which runs on the clients, and metrics are scrapted by a prometheus TSDB.
+## grafana can access prometheus and produce nice trends.
+
+sudo useradd --no-create-home --shell /bin/false node_exporter
+
+#apt-get -y install lm-sensors
+# lm-sensors gets you the power/fan/temp sensors
+yum -y install lm-sensors
+
+
+###  NODE EXPORTER
+
+test -d /local/mnt || mkdir -p /local/mnt
+cd /local/mnt
+tar xzvf /pkg/trmb/config/spool/node_exporter-0.18.1.linux-amd64.tar.gz
+ln -s node_exporter-0.18.1.linux-amd64 node_exporter
+
+#
+echo "Installing RDMA patched node_exporter"
+set -x
+cp /pkg/trmb/config/spool/node_exporter /local/mnt/node_exporter/
+set +x
+
+cat > /etc/systemd/system/node_exporter.service << EOF
+[Unit]
+Description=Node Exporter
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=node_exporter
+Group=node_exporter
+Type=simple
+ExecStart=/local/mnt/node_exporter/node_exporter --collector.tcpstat --collector.mountstats
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+
+for i in node_exporter 
+do systemctl start $i 
+   if [ $? -gt 0 ] 
+     then echo "PROBLEM WITH $i"
+   else systemctl enable $i
+   fi 
+done
+
+systemctl restart node_exporter
+
+ 

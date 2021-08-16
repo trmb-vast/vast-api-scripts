@@ -1,0 +1,16 @@
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo get-docker.sh
+
+docker run -d\
+ --name graphite\
+ --restart=always\
+ -p 8111:80\
+ -p 2003-2004:2003-2004\
+ -p 2023-2024:2023-2024\
+ -p 8125:8125/udp\
+ -p 8126:8126\
+ -v /graphite/configs:/opt/graphite/conf\
+ -v /graphite/data:/opt/graphite/storage\
+ -v /graphite/statsd_config:/opt/statsd/config\
+ graphiteapp/graphite-statsd
+

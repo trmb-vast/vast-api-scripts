@@ -1,0 +1,215 @@
+#!/bin/bash
+
+# Robs script to install prometheus, grafana, snmp_exporter
+# it also sets up RHEL or Ubuntu systemd startup scripts.
+# Note:  /opt/opsmon  is where the binaries, config, and database live
+# last update:  Thu Aug  5 21:31:05 UTC 2021
+#
+# This will build a static host install.. 
+# Not using docker containers for those listed above.
+# its probably still a good idea to run graphite in a docker.
+#
+
+installdir=$(cd $(dirname $0);pwd)
+
+# From time to time you have to update the below URLS to latest
+URL_GRAFANA="https://dl.grafana.com/oss/release/grafana-8.1.0.linux-amd64.tar.gz"
+URL_PROMETHEUS="https://github.com/prometheus/prometheus/releases/download/v2.28.1/prometheus-2.28.1.linux-amd64.tar.gz"
+URL_SNMP_EXPORTER="https://github.com/prometheus/snmp_exporter/releases/download/v0.20.0/snmp_exporter-0.20.0.linux-amd64.tar.gz"
+
+echo "##################################################################"
+echo "## WARNING: This script will make a new directory /opt/opsmon "
+echo "##          and setup Grafana, prometheus, and snmp_exporter there"
+echo "##          another script will install node_exporter for clients"
+
+test -w /etc/passwd || echo "Need to run with sudo"
+test -w /etc/passwd || exit
+
+echo "########## Adding users: grafana prometheus"
+useradd --no-create-home --shell /bin/false grafana
+useradd --no-create-home --shell /bin/false prometheus
+
+#############################################################
+DEPENDENCIES="wget openssl patch"
+echo "########## checking/installing $DEPENDENCIES ########"
+if [ -n "$(hostnamectl | grep 'Operating System' | cut -d: -f2 | egrep 'CentOS|Red')" ]
+then
+  for i in  $DEPENDENCIES
+  do 
+    echo "Checking $i"
+    (rpm -qa | grep "^${i}" ) || yum -y install $i  
+  done 
+else 
+  for i in  $DEPENDENCIES
+  do echo "Checking $i" 
+     (dpkg -l | grep "^${i}" ) || apt-get -y install $i
+  done
+fi
+
+#############################################################
+
+#  Install grafana
+echo "######### Downloading and installing grafana and prometheus"
+#set -x
+mkdir -p /opt/opsmon
+cd /opt/opsmon
+
+get_and_extract(){
+MYURL=$1
+MYFILE=$(echo $MYURL | awk -F/ '{print $NF}')
+test -f $MYFILE || wget $MYURL
+if [ -n "$(echo $MYFILE | grep grafana )" ]
+then
+MYVERS=$(echo $MYFILE | sed -e 's/.linux-amd64.tar.gz//')
+else
+MYVERS=$(echo $MYFILE | sed -e 's/.tar.gz//')
+fi
+echo test -d ${MYVERS} \&\& mv ${MYVERS} ${MYVERS}.old
+test -d ${MYVERS} && mv ${MYVERS} ${MYVERS}.old
+echo tar xf $MYFILE
+tar xf $MYFILE
+SHORTDIRNAME=$(echo $MYFILE | cut -d- -f1)
+rm -f $SHORTDIRNAME
+ln -s $MYVERS $SHORTDIRNAME
+echo rm -f $SHORTDIRNAME
+echo ln -s $MYVERS $SHORTDIRNAME
+
+}
+
+get_and_extract  $URL_GRAFANA
+get_and_extract  $URL_PROMETHEUS
+get_and_extract  $URL_SNMP_EXPORTER
+
+
+echo "############# installing systemd startup files"
+### PROMETHEUS 
+cat > /etc/systemd/system/prometheus.service <<EOF
+[Unit]
+Description=Prometheus Server
+Documentation=https://prometheus.io/docs/introduction/overview/
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=prometheus
+Group=prometheus
+Type=simple
+Restart=on-failure
+ExecStart=/opt/opsmon/prometheus/prometheus \
+                     --config.file /opt/opsmon/prometheus/prometheus.yml \
+                     --storage.tsdb.path /opt/opsmon/prometheus/data
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+### SNMP_EXPORTER
+cat > /etc/systemd/system/snmp_exporter.service <<EOF
+[Unit]
+Description=snmp_exporter Server
+Documentation=https://prometheus.io/docs/introduction/overview/
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=prometheus
+Group=prometheus
+Type=simple
+Restart=on-failure
+ExecStart=/opt/opsmon/snmp_exporter/snmp_exporter \
+                     --config.file /opt/opsmon/snmp_exporter/snmp.yml 
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+############## GRAFANA systemd service
+cat > /etc/systemd/system/grafana.service <<EOF
+[Unit]
+Description=Grafana instance
+Documentation=http://docs.grafana.org
+Wants=network-online.target
+After=network-online.target
+After=prometheus.service 
+
+[Service]
+#EnvironmentFile=/etc/sysconfig/grafana-server
+User=grafana
+Group=grafana
+Type=simple
+Restart=on-failure
+WorkingDirectory=/opt/opsmon/grafana
+RuntimeDirectory=grafana
+RuntimeDirectoryMode=0750
+ExecStart=/opt/opsmon/grafana/bin/grafana-server  --config=/opt/opsmon/grafana/conf/grafana.ini --pidfile=/opt/opsmon/grafana/var/run/grafana.pid
+LimitNOFILE=10000
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+### Cleanup prometheus 
+systemctl stop prometheus
+#rm -rf /opt/opsmon/prometheus/data
+mkdir  /opt/opsmon/prometheus/data
+chown prometheus  /opt/opsmon/prometheus/data
+
+cat >>/opt/opsmon/prometheus/prometheus.yml<<EOF
+
+  - job_name: 'snmp'
+    scrape_interval:     30s # Set the scrape interval to every 10 seconds. Default is every 1 minute.
+    static_configs:
+      - targets:
+        - 10.61.10.153  # SNMP device.
+        - 10.61.10.154  # SNMP device.
+        - 10.61.10.155  # SNMP device.
+        - 10.61.10.156  # SNMP device.
+    metrics_path: /snmp
+    params:
+      module: [if_mib]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: 127.0.0.1:9116  # The SNMP exporter's real hostname:port.
+EOF
+
+
+
+### Cleanup grafana
+mkdir -p /opt/opsmon/grafana/var/run/
+mkdir -p /opt/opsmon/grafana/data
+chown -R grafana /opt/opsmon/grafana/var 
+chown -R grafana /opt/opsmon/grafana/data
+
+echo "Creating grafana.ini file and patching it"
+cp $installdir/sample_ini.diff /opt/opsmon/grafana/conf
+cd /opt/opsmon/grafana/conf
+echo "Info:"
+patch < sample_ini.diff
+cp sample.ini grafana.ini
+
+
+echo "###############  starting up grafana and prometheus via systemd"
+
+systemctl daemon-reload
+
+for i in prometheus grafana snmp_exporter
+do echo Info:  systemctl start $i
+   systemctl start $i 
+   if [ $? -gt 0 ] 
+     then echo "PROBLEM WITH $i"
+   else systemctl enable $i
+   fi 
+   echo "Info: you can run:  systemctl status $i"
+done
+
+echo Warning:
+echo "To finish up the config:"
+echo "sudo vi /opt/opsmon/prometheus/prometheus.yml  and edit SNMP device IP addrs"
+echo "Go into grafana and add datasource: prometheus with http://localhost:9090" 
+echo "You want to import these dashboards into grafana for SNMP:   12492  12489  11169 10523"
+echo "and enable 30 second SNMP intervals on MLX switches:  conf t ; snmp-server auto-refresh interval 30"

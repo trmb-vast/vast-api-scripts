@@ -1,0 +1,14 @@
+#!/bin/bash
+#  build_jshon .. a script to untar and build jshon static.
+#  rob@vastdata.com
+tar xzvf jansson-2.12.tar.gz && cd jansson-2.12
+./configure --enable-static && make && cp src/.libs/libjansson.a ..
+cd ..
+tar xzf jshon.tar.gz && cd jshon-20120914  && cp ../libjansson.a ./
+cp ../jansson-2.12/src/jan*.h ./
+sed -i -e 's/-ljansson/libjansson.a/'  Makefile
+sed -i -e 's/<jansson.h>/"jansson.h"/g' jshon.c
+make
+rm -f ../jshon
+cp jshon ..
+

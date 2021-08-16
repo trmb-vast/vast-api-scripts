@@ -1,0 +1,182 @@
+#!/bin/bash
+#
+#  Vast metrics API scraper 
+#  This is called from the vast-metrics-cron every 5 minutes
+#  it will pull the previous 10 minutes of metrics, and thus fill any holes.
+#  feel free to run it at 1 minute intervals via cron, like this:
+#* * * * * /opt/opsmon/API/get-vast-metrics -p $HOME/.ssh/vms_creds  \
+#     -r 1 -r 2 -r 3 -r 4 -r 5 -r 8 -r 9 -r 15 -c se-202 -v 10.61.10.202 -g 10.61.201.12
+
+#  Author:  rob@vastdata.com
+#  Fri Sep  6 12:34:55 PDT 2019  rmallory .. adapted from metrics scraper.
+#  Wed 11 Aug 2021 02:53:48 AM UTC rmallory .. fit to new api format
+#  Sun 15 Aug 2021 11:34:02 PM UTC rmallory .. refactored for multi-cnodes
+
+# Notes: newer versions at:  https://github.com/trmb-vast/api-tools
+# dependencies:  jshon   http://kmkeen.com/jshon/
+#               netcat "yum install netcat"
+#               curl   "yum install curl"
+#               graphite server somewhere
+
+installdir=$(cd $(dirname $0);pwd)
+PATH=/bin:/usr/bin:/usr/sbin:$installdir
+HOST=$(uname -n)
+
+NC="$(which nc) -w1" #some versions of netcat work better with -w1 arg.
+NC="$(which nc) -w0" #some versions of netcat work quicker with -w0 arg.
+
+####### Fill out your variables here
+VMS=10.61.10.201 #IP of Vast management server
+VMSUSER=admin
+VMSPASS=xxx      # change this or better yet use the -p flag below
+
+# symlink to this script with the cluster name as last _field
+# and it will auto-set the cluster... alternative to -c <cluster>
+CLUSTER=$(echo $0 | awk -F_ '{print $NF}')
+CLUSTER=${CLUSTER:-VastOne}
+echo CLUSTER: $CLUSTER
+
+### if you don't want to use the -g <graphitehost> flag, then set here
+GRAPHITE_HOST=10.61.201.12 #IP of Graphite host
+GRAPHITE_PORT=2003         #Graphite listener port
+DEBUG=false
+
+
+usage(){
+        echo "Usage: $0 -p <credentialfile> -g <graphite host> -c <cluster> -v <vms name/ip>  "
+        echo "     a script to retreive JSON metrics from the VAST API and push to Graphite"
+        echo " the required -r <report>  is the VAST metric ID. ..multiple -r <report> are fine."
+	echo "credentialfile is a file with user:pass  of vms user to run queries as. chmod -rwx it as needed"
+}
+
+DONTSEND=false
+DEBUG=false
+
+while getopts r:p:c:g:v:r:d:Dh c
+do
+    case "$c" in
+    p)  CREDS_FILE="${OPTARG}";;
+    g)  GRAPHITE_HOST="${OPTARG}";;
+    c)  CLUSTER="${OPTARG}";;
+        r)
+        if [ -n "${OPTARG}" ]
+        then
+           REPORTS="${REPORTS} ${OPTARG}"
+        else
+           end_die "Invalid report list supplied"
+        fi
+        ;;
+    v)  VMS="${OPTARG}";;
+    d)  DEBUG=true;;
+    D)  DONTSEND=true;;
+    h|\?)  usage; exit 1;;
+    esac
+done
+    shift $((${OPTIND} - 1))
+
+### reading credentials from a file (readable by this user, or with SUDO)
+### is more safe than embedding passwords in scripts, or passing as args
+    if [ -f $CREDS_FILE ]
+    then
+	    VMSUSER=$(cat $CREDS_FILE | cut -d: -f1)
+	    VMSPASS=$(cat $CREDS_FILE | cut -d: -f2) 
+    fi
+
+if [ "x" = "x${REPORTS}" ]
+then    echo " -r <report> argument is required..."
+        exit
+fi
+
+####
+## Actually, these days we set NOW from the timestamp in the json file
+[[ $(uname -s) = "Linux" ]] && NOW=$(date +%s)
+
+###  this function sends to Graphite
+send() {
+   if [ ! -z "$VERBOSE" ]; then
+      echo "Sending : $1"
+   fi
+   echo $1 | $NC $HOST $GRAPHITE_PORT
+}
+
+
+### this is the main function, caller per report
+scrape_and_send_report()
+{
+
+# Each curl/report goes to a different named file in /tmp
+JSON=/tmp/vmsdata_${CLUSTER}_$(echo $1| tr ' ' '_').json
+rm -f $JSON
+
+#$DEBUG && set -x
+
+echo "...Calling VAST API with curl"
+curl -u ${VMSUSER}:${VMSPASS} -H "accept: application/json" --insecure -X GET "https://$VMS/api/monitors/${1}/query/?granularity=seconds&amp;aggregation=avg&amp;format_data=true" | python3 -m json.tool >$JSON
+
+NUMELEMENTS="$($installdir/jshon -l <$JSON)"
+#NUMELEMENTS=$((NUMELEMENTS-1)) ## we used to do this when we ignored timestamp
+echo NUMELEMENTS=$NUMELEMENTS
+
+#### This pulls out the preperty list..
+PROP_LIST_NUM=$($installdir/jshon -e prop_list -l <$JSON | tr '\n' ' ')
+for i in $(seq 1 $PROP_LIST_NUM)
+do 
+	ELE_NAME[$i]=$($installdir/jshon -e prop_list -e $i  <$JSON | sed 's/"//g' | awk -F= '{print $NF}'| tr ',' '.')
+done
+
+
+#### This just checks if object_id changed.. eg, some reports are by cnode
+for SEQ in $(seq 1 3)
+do 
+	THIS=$($installdir/jshon -e data -e $SEQ -e 1 < $JSON)
+	if [ "$THIS" = "$PREV" ]
+           then $DEBUG && echo "No change.. same object_id"
+  	        MULTI_OBJECT_ID=false  
+           else $DEBUG && echo "object_id changed between samples.."
+                MULTI_OBJECT_ID=true
+	fi
+        $DEBUG && echo PREV THIS   $PREV $THIS
+        PREV=$THIS
+done
+
+for x in $(seq 1 $($installdir/jshon -e data -l <$JSON))  #  should be 60 samples  or 10 minutes at 10 second interval
+do 
+	for i in $(seq 1 $PROP_LIST_NUM)
+	do
+	       if [ ${ELE_NAME[$i]} = "timestamp" ]
+	       then
+       	            # convert to epochtime:   date -d "2019-07-02T02:24:38Z" +%s
+            	  TIMESTAMP=$($installdir/jshon -e data -e $x -e 0  <$JSON)
+            	  TIMESTAMP=$(echo $TIMESTAMP | sed 's/"//g')
+            	  NOW=$(/usr/bin/date -d "$TIMESTAMP" +%s)
+	       fi
+
+	       if [ ${ELE_NAME[$i]} = "object_id" ]
+	       then
+            	  OBJID=$($installdir/jshon -e data -e $x -e $i  <$JSON)
+		  $DEBUG && echo OBJID=$OBJID
+	       fi
+
+	       VAL[$i]=$($installdir/jshon -e data -e $x -e $i  <$JSON | sed 's/"//g' | tr ',' '.')
+  
+  	            # Next line will skip entries named timestamp or object_id
+	       if [ -n "$(echo ${ELE_NAME[$i]} |egrep -v 'timestamp|object_id')" ]
+	       then
+		    if [ "$MULTI_OBJECT_ID" = "true" ]
+			    then echo vast.${CLUSTER}.cnode-${OBJID}.${ELE_NAME[$i]} ${VAL[$i]} $NOW 
+			         echo vast.${CLUSTER}.cnode-${OBJID}.${ELE_NAME[$i]} ${VAL[$i]} $NOW | $NC $GRAPHITE_HOST ${GRAPHITE_PORT}
+		            else echo vast.${CLUSTER}.${ELE_NAME[$i]} ${VAL[$i]} $NOW
+		                 echo vast.${CLUSTER}.${ELE_NAME[$i]} ${VAL[$i]} $NOW | $NC $GRAPHITE_HOST ${GRAPHITE_PORT}
+
+		    fi
+	    fi
+       done
+$DEBUG &&echo x is now $x        
+done
+
+}
+
+for i in $REPORTS
+do scrape_and_send_report $i
+done
+
