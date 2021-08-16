@@ -1,0 +1,129 @@
+#!/bin/bash
+#
+#  Vast metrics API scraper  topN
+#  This is called from the vast-metrics-cron every 5 minutes
+#  rob@vastdata.com
+#  Fri Sep  6 12:34:55 PDT 2019  rmallory .. adapted from metrics scraper.
+#  Wed 11 Aug 2021 02:53:48 AM UTC rmallory .. fit to new api format
+
+# Notes:
+#  topN is tricky... it can really have a TON of data, and fill up your graphite database.
+#  especially since this current version does not omit zero-values...
+#  currently it is meant to run every minute.
+
+#dependencies:  jshon   http://kmkeen.com/jshon/
+#               netcat "yum install netcat"
+#               curl   "yum install curl"
+#               graphite server somewhere
+
+installdir=$(
+   cd $(dirname $0)
+   pwd
+)
+PATH=/bin:/usr/bin:/usr/sbin:$installdir
+HOST=$(uname -n)
+
+NC="$(which nc) -w1" #some versions of netcat work better with -w1 arg.
+NC="$(which nc) -w0" #some versions of netcat work quicker with -w0 arg.
+
+####### Fill out your variables here
+VMS=10.61.10.201 #IP of Vast management server
+VMSUSER=admin
+VMSPASS=xxx
+
+# symlink to this script with the cluster name as last _field
+CLUSTER=$(echo $0 | awk -F_ '{print $NF}')
+if [ "x${CLUSTER}" = "x" ]; then
+   CLUSTER=VastOne
+fi
+
+echo CLUSTER: $CLUSTER
+CLUSTER=se-201
+
+###
+GRAPHITE_HOST=10.61.10.253 #IP of Graphite host
+GRAPHITE_HOST=10.61.201.12 #IP of Graphite host
+GRAPHITE_PORT=2003         #Graphite listener port
+DEBUG=false
+
+
+usage(){
+        echo "Usage: $0 -p <credentialfile> -g <graphite host> -c <cluster> -v <vms name/ip>  "
+        echo "     a script to retreive JSON metrics from VAST API and push to Graphite"
+        echo " the required -r <report>  is the VAST metric ID. "
+	echo "credentialfile is a file with user:pass  of vms user to run queries as."
+}
+
+DONTSEND=false
+DEBUG=false
+
+while getopts p:c:g:v:r:d:Dh c
+do
+    case "$c" in
+    p)  CREDS_FILE="${OPTARG}";;
+    g)  GRAPHITE_HOST="${OPTARG}";;
+    c)  CLUSTER="${OPTARG}";;
+    r)  REPORT="${OPTARG}";;
+    v)  VMS="${OPTARG}";;
+    d)  DEBUG=true;;
+    D)  DONTSEND=true;;
+    h|\?)  usage; exit 1;;
+    esac
+done
+    shift $((${OPTIND} - 1))
+
+
+    if [ -f $CREDS_FILE ]
+    then
+	    VMSUSER=$(cat $CREDS_FILE | cut -d: -f1)
+	    VMSPASS=$(cat $CREDS_FILE | cut -d: -f2) 
+    fi
+
+
+####
+
+[[ $(uname -s) = "Linux" ]] && NOW=$(date +%s)
+
+send() {
+   if [ ! -z "$VERBOSE" ]; then
+      echo "Sending : $1"
+   fi
+   echo $1 | $NC $HOST $GRAPHITE_PORT
+}
+
+JSON=/tmp/topn_${CLUSTER}vmsdata.json
+rm -f $JSON
+
+$DEBUG && set -x
+
+echo "...Calling API with curl"
+curl -u ${VMSUSER}:${VMSPASS} -H "accept: application/json" --insecure -X GET "https://$VMS/api/monitors/topn/" | python3 -m json.tool >$JSON
+
+#'https://10.100.21.201/api/monitors/topn/
+# convert to epochtime:   date -d "2019-07-02T02:24:38Z" +%s
+
+NUMELEMENTS="$($installdir/jshon -l <$JSON)"
+#NUMELEMENTS=$((NUMELEMENTS-1))
+
+echo NUMELEMENTS=$NUMELEMENTS
+
+#### This pulls out the expected fields recursively
+KEYNAMES1=data
+for KEY1 in $KEYNAMES1; do ## data timestamp previous next
+   KEYNAMES2=$($installdir/jshon -e $KEY1 -k <$JSON | tr '\n' ' ')
+   for KEY2 in $KEYNAMES2; do # user view client
+      KEYNAMES3=$($installdir/jshon -e $KEY1 -e $KEY2 -k <$JSON | tr '\n' ' ')
+      for KEY3 in $KEYNAMES3; do #bw iops md_iops
+         KEYNAMES4=$($installdir/jshon -e $KEY1 -e $KEY2 -e $KEY3 -e 0 -k <$JSON | tr '\n' ' ')
+         for KEY4 in $(echo $KEYNAMES4 | sed -e "s/title//" -e "s/total//"); do  #title read write total
+            title=$($installdir/jshon -e $KEY1 -e $KEY2 -e $KEY3 -e 0 -e title -u <$JSON | tr '\n' ' ')
+            # title can have illegal characters in it.. ip addrs dots,  parenthencies for users, slashes.
+            title=$(echo $title | sed 's/(/_/g' | tr -d '\(' | tr -d '\)' | tr '/' '_' | tr '.' '_' | tr -d ' ')
+            title=${title##_}
+            value="$($installdir/jshon -e $KEY1 -e $KEY2 -e $KEY3 -e 0 -e $KEY4 -u <$JSON)"
+            echo vast.${CLUSTER}.topn.$KEY2.$KEY3.$KEY4.$title $value $NOW
+            echo vast.${CLUSTER}.topn.$KEY2.$KEY3.$KEY4.$title $value $NOW  | $NC $GRAPHITE_HOST ${GRAPHITE_PORT}
+         done
+      done
+   done
+done
