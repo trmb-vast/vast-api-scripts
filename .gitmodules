@@ -1,0 +1,15 @@
+[submodule "SUBMODULES/prometheus-mlx5-exporter"]
+	path = SUBMODULES/prometheus-mlx5-exporter
+	url = https://github.com/david-macmahon/prometheus-mlx5-exporter.git
+[submodule "SUBMODULES/switch_exporter"]
+	path = SUBMODULES/switch_exporter
+	url = https://github.com/ska-sa/switch_exporter.git
+[submodule "SUBMODULES/prometheus-ethtool-exporter"]
+	path = SUBMODULES/prometheus-ethtool-exporter
+	url = https://github.com/Showmax/prometheus-ethtool-exporter.git
+[submodule "SUBMODULES/junos_exporter"]
+	path = SUBMODULES/junos_exporter
+	url = https://github.com/tynany/junos_exporter.git
+[submodule "SUBMODULES/another_junos/junos_exporter"]
+	path = SUBMODULES/another_junos/junos_exporter
+	url = https://github.com/czerwonk/junos_exporter
