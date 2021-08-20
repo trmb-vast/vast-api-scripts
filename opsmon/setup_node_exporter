@@ -15,13 +15,12 @@ yum -y install lm-sensors
 
 test -d /local/mnt || mkdir -p /local/mnt
 cd /local/mnt
-tar xzvf /pkg/trmb/config/spool/node_exporter-0.18.1.linux-amd64.tar.gz
-ln -s node_exporter-0.18.1.linux-amd64 node_exporter
 
 #
 echo "Installing RDMA patched node_exporter"
 set -x
-cp /pkg/trmb/config/spool/node_exporter /local/mnt/node_exporter/
+#cp /pkg/trmb/config/spool/node_exporter /local/mnt/node_exporter/
+cp node_exporter /local/mnt/node_exporter/
 set +x
 
 cat > /etc/systemd/system/node_exporter.service << EOF
@@ -35,6 +34,8 @@ User=node_exporter
 Group=node_exporter
 Type=simple
 ExecStart=/local/mnt/node_exporter/node_exporter --collector.tcpstat --collector.mountstats
+#ExecStart=/local/mnt/node_exporter/node_exporter --collector.tcpstat --collector.mountstats --collector.infiniband
+
 
 [Install]
 WantedBy=multi-user.target
