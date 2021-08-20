@@ -1,5 +1,7 @@
 #!/bin/bash
 
+installdir=$(cd $(dirname $0);pwd)
+
 ## These are a cut-n-paste script to setup prometheus/node_exporter
 ## the client-agent which runs on the clients, and metrics are scrapted by a prometheus TSDB.
 ## grafana can access prometheus and produce nice trends.
@@ -14,13 +16,12 @@ yum -y install lm-sensors
 ###  NODE EXPORTER
 
 test -d /local/mnt || mkdir -p /local/mnt
-cd /local/mnt
 
 #
 echo "Installing RDMA patched node_exporter"
 set -x
 #cp /pkg/trmb/config/spool/node_exporter /local/mnt/node_exporter/
-cp node_exporter /local/mnt/node_exporter/
+cp $installdir/node_exporter /local/mnt/node_exporter/
 set +x
 
 cat > /etc/systemd/system/node_exporter.service << EOF
