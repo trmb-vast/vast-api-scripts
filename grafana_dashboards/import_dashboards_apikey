@@ -1,7 +1,10 @@
 #!/bin/bash
-#
+# 
 # add the "-x" option to the shebang line if you want a more verbose output
 #
+#  use like this to import the dashboards:
+# ./import_dashboards_apikey  -u admin -w REDACTED -p admin-localhost-3000 -t localhost:3000
+#  Todo:   change back to https  after we tweak the grafana_installer to do self-signed certs
 # 
 
 #set -x 
@@ -108,7 +111,7 @@ KEYLENGTH=70
 GENERATE_POST_DATA="{\"name\": \"${KEYNAME}\", \"role\": \"Admin\", \"secondsToLive\": 3600 }"
 
 if [ -n "$GRAFANA_USER" ] || [ -n "$GRAFANA_PASSWORD" ] || [ -n "$TARGET_HOST" ]; then
-    KEY=$(curl -X POST -H "Content-Type: application/json" -d "${GENERATE_POST_DATA}" "https://"${GRAFANA_USER}":"${GRAFANA_PASSWORD}"@"${TARGET_HOST}"/api/auth/keys" | jq -r '.key')
+    KEY=$(curl -X POST -H "Content-Type: application/json" -d "${GENERATE_POST_DATA}" "http://"${GRAFANA_USER}":"${GRAFANA_PASSWORD}"@"${TARGET_HOST}"/api/auth/keys" | jq -r '.key')
     if [ ${#KEY} -ge $KEYLENGTH ]; then
         log_title "---- API Key Generated successfully, correct character number generated in API Key, we're going into the next step -----"
     else
@@ -146,7 +149,7 @@ COUNTER=0
 for DASH_FILE in $DASH_LIST; do 
     COUNTER=$((COUNTER + 1))
     echo "Import $COUNTER/$FILESTOTAL: $DASH_FILE..."
-    RESULT=$(cat "$DASH_FILE" | jq '. * {overwrite: true, dashboard: {id: null}}' | curl -s -X POST -H "Content-Type: application/json" -H "Authorization: Bearer $KEY" "https://$TARGET_HOST/api/dashboards/db" -d @-)
+    RESULT=$(cat "$DASH_FILE" | jq '. * {overwrite: true, dashboard: {id: null}}' | curl -s -X POST -H "Content-Type: application/json" -H "Authorization: Bearer $KEY" "http://$TARGET_HOST/api/dashboards/db" -d @-)
     if [[ "$RESULT" == *"success"* ]]; then
         log_success "$RESULT"
         NUMSUCCESS=$((NUMSUCCESS + 1))
