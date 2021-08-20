@@ -13,7 +13,7 @@
 installdir=$(cd $(dirname $0);pwd)
 
 # From time to time you have to update the below URLS to latest
-URL_GRAFANA="https://dl.grafana.com/oss/release/grafana-8.1.0.linux-amd64.tar.gz"
+URL_GRAFANA="https://dl.grafana.com/oss/release/grafana-8.1.2.linux-amd64.tar.gz"
 URL_PROMETHEUS="https://github.com/prometheus/prometheus/releases/download/v2.28.1/prometheus-2.28.1.linux-amd64.tar.gz"
 URL_SNMP_EXPORTER="https://github.com/prometheus/snmp_exporter/releases/download/v0.20.0/snmp_exporter-0.20.0.linux-amd64.tar.gz"
 
