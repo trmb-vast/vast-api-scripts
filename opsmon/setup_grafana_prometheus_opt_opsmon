@@ -218,5 +218,5 @@ echo "Go into grafana and add datasource: prometheus with http://localhost:9090"
 echo "You want to import these dashboards into grafana for SNMP:   12492  12489  11169 10523"
 echo "And also import the dashboards from https://github.com/trmb-vast/vast-api-scripts/tree/main/grafana_dashboards"
 echo 
-echo "If you would like 15 second interval snmp stats from the mellanox switches, change the prometheus.yml file,"
-echo "and enable 15 second SNMP intervals on MLX switches:  conf t ; snmp-server auto-refresh interval 15"
+echo "If you would like 20 second interval snmp stats from the mellanox switches, change the prometheus.yml file,"
+echo "and enable 20 second SNMP intervals on MLX switches:  conf t ; snmp-server auto-refresh interval 20"

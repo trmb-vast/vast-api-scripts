@@ -8,6 +8,12 @@ screen -S ethtool-exporter -m -d bin/ethtool-exporter.py -w '.x_.*' -I enp94s0f1
 
 Run these on the *opsmon* server where you can poll other clients and be polled by prometheus 
 ```
+# sometimes it is easier to run in a docker container.. like when you don't want to pollyte your python modules
+cd switch-exporter
+sudo docker build .
+
+# sometimes it is easier to python3 setup.py install    
+# and then run it locally.
 screen -d -m -S "switch_exporter" /usr/local/bin/switch-exporter
 ```
 

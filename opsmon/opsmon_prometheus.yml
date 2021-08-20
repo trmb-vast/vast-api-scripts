@@ -52,7 +52,7 @@ scrape_configs:
     - targets: ['10.61.10.141:9182']
 
   - job_name: 'snmp'
-    scrape_interval:     30s # Set the scrape interval to every 30 seconds. MLX can go more frequent with switch settings. 
+    scrape_interval:     20s # Set the scrape interval to every 20 seconds. MLX:   snmp-server auto-refresh interval 20
     static_configs:
       - targets:
         - 10.61.10.153  # SNMP device.
