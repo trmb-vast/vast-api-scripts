@@ -209,7 +209,14 @@ done
 
 echo Warning:
 echo "To finish up the config:"
+echo "add various exporters to prometheus as seen in the diff below."
+echo "diff opsmon_prometheus.yml /opt/opsmon/prometheus/prometheus.yml"
 echo "sudo vi /opt/opsmon/prometheus/prometheus.yml  and edit SNMP device IP addrs"
+echo "sudo systemctl restart prometheus"
+echo
 echo "Go into grafana and add datasource: prometheus with http://localhost:9090" 
 echo "You want to import these dashboards into grafana for SNMP:   12492  12489  11169 10523"
-echo "and enable 30 second SNMP intervals on MLX switches:  conf t ; snmp-server auto-refresh interval 30"
+echo "And also import the dashboards from https://github.com/trmb-vast/vast-api-scripts/tree/main/grafana_dashboards"
+echo 
+echo "If you would like 15 second interval snmp stats from the mellanox switches, change the prometheus.yml file,"
+echo "and enable 15 second SNMP intervals on MLX switches:  conf t ; snmp-server auto-refresh interval 15"
