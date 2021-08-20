@@ -1,0 +1,70 @@
+*** sample.ini	2021-05-19 13:13:39.000000000 +0000
+--- grafana.ini	2021-06-07 04:13:38.355647351 +0000
+***************
+*** 12,18 ****
+  #################################### Paths ####################################
+  [paths]
+  # Path to where grafana can store temp files, sessions, and the sqlite3 db (if that is used)
+! ;data = /var/lib/grafana
+  
+  # Temporary files in `data` directory older than given duration will be removed
+  ;temp_data_lifetime = 24h
+--- 12,18 ----
+  #################################### Paths ####################################
+  [paths]
+  # Path to where grafana can store temp files, sessions, and the sqlite3 db (if that is used)
+! data = /opt/opsmon/grafana/data
+  
+  # Temporary files in `data` directory older than given duration will be removed
+  ;temp_data_lifetime = 24h
+***************
+*** 21,27 ****
+  ;logs = /var/log/grafana
+  
+  # Directory where grafana will automatically scan and look for plugins
+! ;plugins = /var/lib/grafana/plugins
+  
+  # folder that contains provisioning config files that grafana will apply on startup and while running.
+  ;provisioning = conf/provisioning
+--- 21,27 ----
+  ;logs = /var/log/grafana
+  
+  # Directory where grafana will automatically scan and look for plugins
+! plugins = /opt/opsmon/grafana/plugins
+  
+  # folder that contains provisioning config files that grafana will apply on startup and while running.
+  ;provisioning = conf/provisioning
+***************
+*** 176,182 ****
+  # No ip addresses are being tracked, only simple counters to track
+  # running instances, dashboard and error counts. It is very helpful to us.
+  # Change this option to false to disable reporting.
+! ;reporting_enabled = true
+  
+  # The name of the distributor of the Grafana instance. Ex hosted-grafana, grafana-labs
+  ;reporting_distributor = grafana-labs
+--- 176,182 ----
+  # No ip addresses are being tracked, only simple counters to track
+  # running instances, dashboard and error counts. It is very helpful to us.
+  # Change this option to false to disable reporting.
+! reporting_enabled = false
+  
+  # The name of the distributor of the Grafana instance. Ex hosted-grafana, grafana-labs
+  ;reporting_distributor = grafana-labs
+***************
+*** 209,215 ****
+  ;secret_key = SW2YcwTIb9zpOOhoPsMm
+  
+  # disable gravatar profile images
+! ;disable_gravatar = false
+  
+  # data source proxy whitelist (ip_or_domain:port separated by spaces)
+  ;data_source_proxy_whitelist =
+--- 209,215 ----
+  ;secret_key = SW2YcwTIb9zpOOhoPsMm
+  
+  # disable gravatar profile images
+! disable_gravatar = true
+  
+  # data source proxy whitelist (ip_or_domain:port separated by spaces)
+  ;data_source_proxy_whitelist =
