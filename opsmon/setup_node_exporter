@@ -15,7 +15,7 @@ yum -y install lm-sensors
 
 ###  NODE EXPORTER
 
-test -d /local/mnt || mkdir -p /local/mnt
+test -d /local/mnt/node_exporter || mkdir -p /local/mnt/node_exporter
 
 #
 echo "Installing RDMA patched node_exporter"
