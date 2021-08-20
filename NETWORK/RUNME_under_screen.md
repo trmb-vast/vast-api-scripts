@@ -2,8 +2,8 @@ How to Start these:
 
 Run the following on a CLIENT which you want to gather mellanox counters for"
 ```
-screen -S prometheus-mlx5-exporter -m -d prometheus-mlx5-exporter/prometheus-mlx5-exporter.rb  -l -
-screen -S ethtool-exporter -m -d prometheus-ethtool-exporter/ethtool-exporter.py -w '.x_.*' -I enp94s0f1   -p 9417
+screen -S prometheus-mlx5-exporter -m -d bin/prometheus-mlx5-exporter.rb  -l -
+screen -S ethtool-exporter -m -d bin/ethtool-exporter.py -w '.x_.*' -I enp94s0f1   -p 9417
 ```
 
 Run these on the *opsmon* server where you can poll other clients and be polled by prometheus 
