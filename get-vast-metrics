@@ -11,12 +11,14 @@
 #  Fri Sep  6 12:34:55 PDT 2019  rmallory .. adapted from metrics scraper.
 #  Wed 11 Aug 2021 02:53:48 AM UTC rmallory .. fit to new api format
 #  Sun 15 Aug 2021 11:34:02 PM UTC rmallory .. refactored for multi-cnodes
-
+#  Mon 30 Aug 2021 07:32:17 PM UTC rmallory .. removed python dependency.. fixed DONTSEND flag
+#
 # Notes: newer versions at:  https://github.com/trmb-vast/api-tools
-# dependencies:  jshon   http://kmkeen.com/jshon/
+# dependencies: jshon   http://kmkeen.com/jshon/  (use my build_jshon script)
 #               netcat "yum install netcat"
 #               curl   "yum install curl"
-#               graphite server somewhere
+#               graphite server somewhere  (or use -the -D flag)
+#               python - for pretty printing -processing json .. no longer needed
 
 installdir=$(cd $(dirname $0);pwd)
 PATH=/bin:/usr/bin:/usr/sbin:$installdir
@@ -46,7 +48,8 @@ usage(){
         echo "Usage: $0 -p <credentialfile> -g <graphite host> -c <cluster> -v <vms name/ip>  "
         echo "     a script to retreive JSON metrics from the VAST API and push to Graphite"
         echo " the required -r <report>  is the VAST metric ID. ..multiple -r <report> are fine."
-	echo "credentialfile is a file with user:pass  of vms user to run queries as. chmod -rwx it as needed"
+	echo "-p <credentialfile> is a file with user:pass  of vms user to run queries as. chmod go-rwx it as needed"
+	echo "use the -D flag to prevent sending to the -g Graphite host. or dont pass -g " 
 }
 
 DONTSEND=false
@@ -87,18 +90,13 @@ then    echo " -r <report> argument is required..."
         exit
 fi
 
+if [ "x" = "x${GRAPHITE_HOST}" ]
+then    DONTSEND=true
+fi
+
 ####
 ## Actually, these days we set NOW from the timestamp in the json file
 [[ $(uname -s) = "Linux" ]] && NOW=$(date +%s)
-
-###  this function sends to Graphite
-send() {
-   if [ ! -z "$VERBOSE" ]; then
-      echo "Sending : $1"
-   fi
-   echo $1 | $NC $HOST $GRAPHITE_PORT
-}
-
 
 ### this is the main function, caller per report
 scrape_and_send_report()
@@ -111,7 +109,8 @@ rm -f $JSON
 #$DEBUG && set -x
 
 echo "...Calling VAST API with curl"
-curl -u ${VMSUSER}:${VMSPASS} -H "accept: application/json" --insecure -X GET "https://$VMS/api/monitors/${1}/query/?granularity=seconds&amp;aggregation=avg&amp;format_data=true" | python3 -m json.tool >$JSON
+#curl -u ${VMSUSER}:${VMSPASS} -H "accept: application/json" --insecure -X GET "https://$VMS/api/monitors/${1}/query/?granularity=seconds&amp;aggregation=avg&amp;format_data=true" | python3 -m json.tool >$JSON
+curl -u ${VMSUSER}:${VMSPASS} -H "accept: application/json" --insecure -X GET "https://$VMS/api/monitors/${1}/query/?granularity=seconds&amp;aggregation=avg&amp;format_data=true"  >$JSON
 
 NUMELEMENTS="$($installdir/jshon -l <$JSON)"
 #NUMELEMENTS=$((NUMELEMENTS-1)) ## we used to do this when we ignored timestamp
@@ -164,10 +163,9 @@ do
 	       then
 		    if [ "$MULTI_OBJECT_ID" = "true" ]
 			    then echo vast.${CLUSTER}.cnode-${OBJID}.${ELE_NAME[$i]} ${VAL[$i]} $NOW 
-			         echo vast.${CLUSTER}.cnode-${OBJID}.${ELE_NAME[$i]} ${VAL[$i]} $NOW | $NC $GRAPHITE_HOST ${GRAPHITE_PORT}
+			         $DONTSEND || echo vast.${CLUSTER}.cnode-${OBJID}.${ELE_NAME[$i]} ${VAL[$i]} $NOW | $NC $GRAPHITE_HOST ${GRAPHITE_PORT}
 		            else echo vast.${CLUSTER}.${ELE_NAME[$i]} ${VAL[$i]} $NOW
-		                 echo vast.${CLUSTER}.${ELE_NAME[$i]} ${VAL[$i]} $NOW | $NC $GRAPHITE_HOST ${GRAPHITE_PORT}
-
+		                 $DONTSEND || echo vast.${CLUSTER}.${ELE_NAME[$i]} ${VAL[$i]} $NOW | $NC $GRAPHITE_HOST ${GRAPHITE_PORT}
 		    fi
 	    fi
        done

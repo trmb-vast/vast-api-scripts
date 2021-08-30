@@ -73,23 +73,20 @@ done
     shift $((${OPTIND} - 1))
 
 
-    if [ -f $CREDS_FILE ]
+if [ -f $CREDS_FILE ]
     then
 	    VMSUSER=$(cat $CREDS_FILE | cut -d: -f1)
 	    VMSPASS=$(cat $CREDS_FILE | cut -d: -f2) 
-    fi
+fi
+
+if [ "x" = "x${GRAPHITE_HOST}" ]
+    then    DONTSEND=true
+fi
 
 
 ####
 
 [[ $(uname -s) = "Linux" ]] && NOW=$(date +%s)
-
-send() {
-   if [ ! -z "$VERBOSE" ]; then
-      echo "Sending : $1"
-   fi
-   echo $1 | $NC $HOST $GRAPHITE_PORT
-}
 
 JSON=/tmp/topn_${CLUSTER}vmsdata.json
 rm -f $JSON
@@ -97,7 +94,8 @@ rm -f $JSON
 $DEBUG && set -x
 
 echo "...Calling API with curl"
-curl -u ${VMSUSER}:${VMSPASS} -H "accept: application/json" --insecure -X GET "https://$VMS/api/monitors/topn/" | python3 -m json.tool >$JSON
+#curl -u ${VMSUSER}:${VMSPASS} -H "accept: application/json" --insecure -X GET "https://$VMS/api/monitors/topn/" | python3 -m json.tool >$JSON
+curl -u ${VMSUSER}:${VMSPASS} -H "accept: application/json" --insecure -X GET "https://$VMS/api/monitors/topn/" >$JSON
 
 #'https://10.100.21.201/api/monitors/topn/
 # convert to epochtime:   date -d "2019-07-02T02:24:38Z" +%s
@@ -122,7 +120,7 @@ for KEY1 in $KEYNAMES1; do ## data timestamp previous next
             title=${title##_}
             value="$($installdir/jshon -e $KEY1 -e $KEY2 -e $KEY3 -e 0 -e $KEY4 -u <$JSON)"
             echo vast.${CLUSTER}.topn.$KEY2.$KEY3.$KEY4.$title $value $NOW
-            echo vast.${CLUSTER}.topn.$KEY2.$KEY3.$KEY4.$title $value $NOW  | $NC $GRAPHITE_HOST ${GRAPHITE_PORT}
+            $DONTSEND || echo vast.${CLUSTER}.topn.$KEY2.$KEY3.$KEY4.$title $value $NOW  | $NC $GRAPHITE_HOST ${GRAPHITE_PORT}
          done
       done
    done
