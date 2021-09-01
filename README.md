@@ -12,6 +12,9 @@ Scripts to talk to VAST REST API
  blatantly overwrite similar data and fill in any holes.
  and yes, your grafana page lags by a minute.
 
+### Wheretoget
+git clone https://github.com/trmb-vast/vast-api-scripts.git
+
 
 ### Prerequisites:
 * Access to a VAST cluster with admin or support credentials
