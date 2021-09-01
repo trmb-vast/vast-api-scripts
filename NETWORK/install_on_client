@@ -1,0 +1,15 @@
+#!/bin/bash
+
+#XXX quick hack.. needs more seatbelts.
+
+[[ -x /bin/dpkg ]] && (dpkg -l | grep ruby || sudo apt-get install ruby)
+[[ -x /bin/rpm  ]] && (rpm -qa | grep ruby || sudo yum install ruby)
+
+sudo pip3 install  prometheus_client
+
+INTS=$(ibdev2netdev | grep Up | awk '{print $5}' | tr '\n' ' ' | sed 's/bond.//g'  | sed 's/enp59s0f1//g' | tr '\n' ',')
+INTS=${INTS%%,}
+
+echo run this
+echo screen -S ethtool-exporter -m -d "bin/ethtool-exporter.py -w '.x_.*' -I enp94s0f0,enp94s0f1    -p 9417"
+
