@@ -10,6 +10,15 @@ sudo pip3 install  prometheus_client
 INTS=$(ibdev2netdev | grep Up | awk '{print $5}' | tr '\n' ' ' | sed 's/bond.//g'  | sed 's/enp59s0f1//g' | tr '\n' ',')
 INTS=${INTS%%,}
 
-echo run this
+MYIP=$(ifconfig eno1 | grep inet | grep -v inet6 | awk '{print $2}')
+
+
+echo run this on the client:
 echo screen -S ethtool-exporter -m -d "bin/ethtool-exporter.py -w '.x_.*' -I enp94s0f0,enp94s0f1    -p 9417"
+
+echo add this to the prometheus server:
+echo sudo vi /opt/opsmon/prometheus/prometheus.yml 
+cat << EOF | sed -e "s/MYIP/$MYIP/g"
+    - targets: ['10.61.13.11:9615']
+EOF
 
