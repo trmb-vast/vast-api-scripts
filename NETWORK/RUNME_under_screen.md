@@ -1,5 +1,12 @@
 How to Start these:
 
+Needs dependencies:
+````
+sudu yum install ruby
+sudu pip3 install prometheus_client
+````
+
+
 Run the following on a CLIENT which you want to gather mellanox counters for"
 ```
 screen -S prometheus-mlx5-exporter -m -d bin/prometheus-mlx5-exporter.rb  -l -
