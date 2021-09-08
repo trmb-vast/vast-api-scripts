@@ -1,5 +1,5 @@
 # vast-api-scripts
-Scripts to talk to VAST REST API
+Example Scripts to talk to VAST REST API
 
  These are informally supported by Rob@vastdata.com
  There is a ton of end-user-preferences around which TSDB and what language to write it in
@@ -12,7 +12,7 @@ Scripts to talk to VAST REST API
  blatantly overwrite similar data and fill in any holes.
  and yes, your grafana page lags by a minute.
 
-### Wheretoget
+### Where to get
 git clone https://github.com/trmb-vast/vast-api-scripts.git
 
 
@@ -82,7 +82,8 @@ wget https://raw.githubusercontent.com/trmb-vast/api-tools/master/build_jshon
 bash ./build_jshon
 ```
 
-### Step 4:   Create Crontab entries
+
+### Step 4:   Create Crontab entries for the VAST api collector scripts
 
 Definition of Flags:
 ```
@@ -98,8 +99,20 @@ Definition of Flags:
 #
 * * * * * /home/vastdata/opsmon/API/get-vast-metrics -p $HOME/.ssh/vms_creds  -r 1 -r 2 -r 3 -r 4 -r 5 -r 8 -r 9 -r 15 -c se-201 -v 10.61.10.201 -g 10.61.201.12
 ```
+Note:  You can get a **list of the Reports** (-r flag above) with the following:
+```
+curl -u admin:######## -H "accept: application/json" --insecure -X GET "https://##.##.##.###/api/monitors/" | python3 -m json.tool   
+```
+Note:  You can get a **list of the Metrics** (and a mapping of their fqn (fully qualified name, or internal name)  to Title:
 
+```
+curl -u admin:######## -H "accept: application/json" --insecure -X GET "https://##.##.##.###/api/metrics/" | python3 -m json.tool   
+```
+
+Caution: Some of the reports are more expensive to retreive than others.. For example, report 10 and 11 are for NFS-RPC metrics.
+that is not so expensive to retreive,  but a cluster with 20 or 32 cnodes, you probably do not want to collect 10 second interval data for each cnode. (report 12 and 13)
 
 ### Step5:  Import JSON dashboards into Grafana
  you will find a monitoring dashboard in the grafana_dashboards subdir.
+
 
