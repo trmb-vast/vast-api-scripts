@@ -1,0 +1,199 @@
+#!/bin/bash
+#
+#  Vast metrics API scraper
+#  This is called from the vast-metrics-cron every 5 minutes
+#  it will pull the previous 10 minutes of metrics, and thus fill any holes.
+#  feel free to run it at 1 minute intervals via cron, like this:
+#* * * * * /opt/opsmon/API/get-vast-capacity -p $HOME/.ssh/vms_creds  \
+#     -r /scratch1 -c se-202 -v 10.61.10.202 -g 10.61.201.12
+
+#  Author:  rob@vastdata.com
+#  Thu 14 Oct 2021 10:38:22 PM UTC rmallory .. first public release.
+#  Fri Sep  6 12:34:55 PDT 2019  rmallory .. adapted from metrics scraper.
+#
+# Notes: newer versions at:  https://github.com/trmb-vast/api-tools
+# dependencies: jshon   http://kmkeen.com/jshon/  (use my build_jshon script)
+#               netcat "yum install netcat"
+#               curl   "yum install curl"
+#               graphite server somewhere  (or use -the -D flag)
+#               python - for pretty printing -processing json .. no longer needed
+# Examples
+# https://192.168.10.209/api/capacity/?path=/scratch1/robtest/dwayne-therock-johnson.older&type=usable
+
+installdir=$(
+	cd $(dirname $0)
+	pwd
+)
+PATH=/bin:/usr/bin:/usr/sbin:$installdir
+HOST=$(uname -n)
+
+test -x /usr/bin/rpm && NC="$(which nc) -w1" #some versions of netcat work better with -w1 arg.
+test -x /usr/bin/apt && NC="$(which nc) -w0" #some versions of netcat work quicker with -w0 arg.
+
+####### Fill out your variables here, or better yet, use commandline args
+VMS=10.61.10.201 #IP of Vast management server
+VMSUSER=admin
+VMSPASS=xxx # change this or better yet use the -p flag below
+
+# symlink to this script with the cluster name as last _field
+# and it will auto-set the cluster... alternative to -c <cluster>
+CLUSTER=$(echo $0 | awk -F_ '{print $NF}')
+CLUSTER=${CLUSTER:-VastOne}
+
+### if you don't want to use the -g <graphitehost> flag, then set here
+GRAPHITE_HOST=10.61.201.12 #IP of Graphite host
+GRAPHITE_PORT=2003         #Graphite listener port
+
+usage() {
+	echo "Usage: $0 -p <credentialfile> -g <graphite host> -c <cluster> -v <vms name/ip>  "
+	echo "     a script to retreive JSON metrics from the VAST API and push to Graphite"
+	echo " the required -r <report>  is the VAST metric ID. ..multiple -r <report> are fine."
+	echo "-p <credentialfile> is a file with user:pass  of vms user to run queries as. chmod go-rwx it as needed"
+	echo "use the -D flag to prevent sending to the -g Graphite host. or dont pass -g "
+	echo "-r is not optional.. -r /   for the root,   -r /scratch1 to report on the /scratch1 subdir. "
+	echo "Note: this query only drills down 3 levels deep, thus the -r flag to get deeper or more granular."
+}
+
+DONTSEND=false
+DEBUG=false
+
+while getopts r:p:c:g:v:r:dDh c; do
+	case "$c" in
+	p) CREDS_FILE="${OPTARG}" ;;
+	g) GRAPHITE_HOST="${OPTARG}" ;;
+	c) CLUSTER="${OPTARG}" ;;
+	r)
+		if [ -n "${OPTARG}" ]; then
+			REPORTS="${OPTARG}/"
+		else
+			end_die "Invalid report list supplied"
+		fi
+		;;
+	v) VMS="${OPTARG}" ;;
+	d) DEBUG=true ;;
+	D) DONTSEND=true ;;
+	h | \?)
+		usage
+		exit 1
+		;;
+	esac
+done
+shift $((${OPTIND} - 1))
+
+echo CLUSTER: $CLUSTER
+
+### reading credentials from a file (readable by this user, or with SUDO)
+### is more safe than embedding passwords in scripts, or passing as args
+if [ -f $CREDS_FILE ]; then
+	VMSUSER=$(cat $CREDS_FILE | cut -d: -f1)
+	VMSPASS=$(cat $CREDS_FILE | cut -d: -f2)
+fi
+
+if [ "x" = "x${REPORTS}" ]; then
+	echo " -r <report> argument is required..."
+	exit
+fi
+
+if [ "x" = "x${GRAPHITE_HOST}" ]; then
+	DONTSEND=true
+fi
+
+####
+# Each curl/report goes to a different named file in /tmp
+JSON=/tmp/vmsdata_capacity_${CLUSTER}_$(echo $1 | tr ' ' '_').json
+rm -f $JSON
+####
+
+## Actually, these days we set NOW from the timestamp in the json file
+[[ $(uname -s) = "Linux" ]] && NOW=$(date +%s)
+
+
+check_vast_sw_version() {
+	$DEBUG && set -x
+	curl -s -u ${VMSUSER}:${VMSPASS} -k https://$VMS/api/clusters/?fields=psnt,name,sw_version,build,ssd_raid_state,nvram_raid_state,memory_raid_state,upgrade_state >${JSON}_versions
+	SW_VERSION="$($installdir/jshon -e 0 -e sw_version -u <${JSON}_versions | cut -d. -f1)"
+	if [ $SW_VERSION -lt 4 ]
+
+	then echo "ERROR... API not supported for this call.. VAST version 4.0 or greater is required."
+		 exit
+	 else echo "VAST version 4 found.. we can continue"
+	fi
+	$DEBUG && set +x
+}
+check_vast_sw_version
+
+scrape_and_send_report() {
+
+	$DEBUG && set -x
+
+	echo "...Calling VAST API for report $1 with curl"
+	#curl -u ${VMSUSER}:${VMSPASS} -H "accept: application/json" --insecure -X GET "https://$VMS/api/capacity/?granularity=seconds&amp;aggregation=avg&amp;format_data=true" >$JSON
+	#curl -u ${VMSUSER}:${VMSPASS} -H "accept: application/json" --insecure -X GET "https://$VMS/api/capacity/" | python3 -m json.tool >$JSON
+	curl -u ${VMSUSER}:${VMSPASS} -H "accept: application/json" --insecure -X GET "https://$VMS/api/capacity/?path=$REPORTS" | python3 -m json.tool >$JSON
+
+	NUMELEMENTS="$($installdir/jshon -e details -l <$JSON)"
+	echo NUMELEMENTS=$NUMELEMENTS
+
+	#### This pulls out the preperty list..
+	KEYS_NUM=$($installdir/jshon -e keys -l <$JSON | tr '\n' ' ')
+	#[
+	# "usable",
+	#"unique",
+	#"logical"
+	#]   # Note.. this is pretty cool.. we can derive the DRR  from logical / unique
+	# The below just gets the keys names.. as seen above. we call them ELE_NAME
+	for i in $(seq 1 $KEYS_NUM); do
+		ELE_NAME[$i]=$($installdir/jshon -e keys -e $i <$JSON | sed 's/"//g' | awk -F= '{print $NF}' | tr ',' '.')
+	done
+
+	# Also, There are a couple more interesting ones.. root_data (entire cluster)  and small_folders (unknown yet)
+	# we will check those out later.
+
+	#[vastdata@vast-ait-1-cn12-opsmon vast-api-scripts]$ jshon -e details -e 0  -e 1 -k < $JSON
+	#data
+	#parent
+	#percent
+	#average_atime
+
+	# step1)  get the timestamp of this json sample  .. we use this throughout.. we could use average_atime also.
+	TIMESTAMP=$($installdir/jshon -e time <$JSON)
+	TIMESTAMP=$(echo $TIMESTAMP | sed 's/"//g')
+	NOW=$(/usr/bin/date -d "$TIMESTAMP" +%s)
+
+	# step2) for each of the samples
+	for x in $(seq 1 $NUMELEMENTS); do
+	$DEBUG && echo INFO: x is now $x
+
+		DIR=$($installdir/jshon -e details -e $x -e 0 <$JSON | sed 's/"//g' | tr ',' '.')
+		PARENT=$($installdir/jshon -e details -e $x -e 1 -e parent <$JSON | sed 's/"//g' | tr ',' '.')
+		USEABLE=$($installdir/jshon -e details -e $x -e 1 -e data -e 0 <$JSON | sed 's/"//g' | tr ',' '.')
+		UNIQUE=$($installdir/jshon -e details -e $x -e 1 -e data -e 1 <$JSON | sed 's/"//g' | tr ',' '.')
+		LOGICAL=$($installdir/jshon -e details -e $x -e 1 -e data -e 2 <$JSON | sed 's/"//g' | tr ',' '.')
+# Hmm..  I think we have a bug.. or Im mis-interpriting the meaning .. I had to flip-flop these
+                DRR=$(echo "$USEABLE / $UNIQUE" | bc -l) 
+#                DRR=$(echo "$UNIQUE / $LOGICAL" | bc -l) 
+    if [ $PARENT = "/" ] ; then PARENT=/root ; fi
+
+		#echo vast.${CLUSTER}.capacity${PARENT}${DIR}.useable $USEABLE $NOW
+		#$DONTSEND || echo vast.${CLUSTER}.capacity${PARENT}${DIR}.useable $USEABLE $NOW | $NC $GRAPHITE_HOST ${GRAPHITE_PORT}
+		#echo vast.${CLUSTER}.capacity${PARENT}${DIR}.unique $UNIQUE $NOW
+		#$DONTSEND || echo vast.${CLUSTER}.capacity${PARENT}${DIR}.unique $UNIQUE $NOW | $NC $GRAPHITE_HOST ${GRAPHITE_PORT}
+		#echo vast.${CLUSTER}.capacity${PARENT}${DIR}.logical $LOGICAL $NOW
+		#$DONTSEND || echo vast.${CLUSTER}.capacity${PARENT}${DIR}.logical $LOGICAL $NOW | $NC $GRAPHITE_HOST ${GRAPHITE_PORT}
+		#echo vast.${CLUSTER}.capacity${PARENT}${DIR}.drr $DRR $NOW
+		#$DONTSEND || echo vast.${CLUSTER}.capacity${PARENT}${DIR}.drr $DRR $NOW | $NC $GRAPHITE_HOST ${GRAPHITE_PORT}
+		echo vast.${CLUSTER}.capacity${DIR}.useable $USEABLE $NOW
+		$DONTSEND || echo vast.${CLUSTER}.capacity${DIR}.useable $USEABLE $NOW | $NC $GRAPHITE_HOST ${GRAPHITE_PORT}
+		echo vast.${CLUSTER}.capacity${DIR}.unique $UNIQUE $NOW
+		$DONTSEND || echo vast.${CLUSTER}.capacity${DIR}.unique $UNIQUE $NOW | $NC $GRAPHITE_HOST ${GRAPHITE_PORT}
+		echo vast.${CLUSTER}.capacity${DIR}.logical $LOGICAL $NOW
+		$DONTSEND || echo vast.${CLUSTER}.capacity${DIR}.logical $LOGICAL $NOW | $NC $GRAPHITE_HOST ${GRAPHITE_PORT}
+		echo vast.${CLUSTER}.capacity${DIR}.drr $DRR $NOW
+		$DONTSEND || echo vast.${CLUSTER}.capacity${DIR}.drr $DRR $NOW | $NC $GRAPHITE_HOST ${GRAPHITE_PORT}
+	done
+}
+
+scrape_and_send_report
+#for i in $REPORTS; do
+#	scrape_and_send_report $i
+#done
