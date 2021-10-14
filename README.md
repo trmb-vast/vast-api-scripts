@@ -2,16 +2,17 @@
 ![Alt Text](https://uploads.vastdata.com/2020/04/logo.svg)
 Example Scripts to talk to VAST REST API
 
- These are informally supported by Rob@vastdata.com
- There is a ton of end-user-preferences around which TSDB and what language to write it in
+ These are primarily supported by Rob at vastdata.com
 
- This repo is the more simple combination: bash, netcat, jshon, and graphite, grafana.
- you can use it as is, or as an example to re-do in any framework,language,tsdb of your chosing.
+ There is a ton of end-user-preferences around which TSDB and what language to write it in.
 
- yes, it is once per minute,  yes, sometimes metrics are not yet ready, so there are "holes"
- in your most recent data, but VAST api returns all of the last 10 minutes, and graphite will
+ To make it easy to learn and springboard from, This repo is the simple combination: bash, netcat, jshon, and graphite, grafana.
+ you can use it as is, or as an example to re-do in any framework, programming language, tsdb of your chosing.
+
+ To make it simple to configure, it is run from cron once per minute,  yes, sometimes metrics are not yet ready, so there are "holes"
+ in your most recent data, but VAST api returns all entries of the last 10 minutes, and graphite will
  blatantly overwrite similar data and fill in any holes.
- and yes, your grafana page lags by a minute.
+ but yes, your grafana page lags by a minute. this is similar to other collectors.
 
 ### Where to get
 git clone https://github.com/trmb-vast/vast-api-scripts.git
@@ -44,18 +45,20 @@ docker run -d\
  -v /graphite/statsd_config:/opt/statsd/config\
  graphiteapp/graphite-statsd
 ```
-Note: in the example above, we map /graphite/data on the local host to store the conf files. You need to create those directories/filesystems and have enough space to house the data collected.
+Note: in the example above, we remap graphite to port 8111, and we map /graphite/data on the local host to store the config and data files. 
+Important: You need to create those directories/filesystems and have enough space to house the data collected.
  
  
 Read up on how to change the **storage_schemas.conf**. 
-set it up like shown below for high resolution for 24hrs and 1m for 90 days.
+set it up like shown below for high resolution for 48hrs and 1m for 120 days, and 1hour averages to to 3 years.
+extend that if you like to multiple months or years but pay attention to the filesize it creates.
 
 ```
 grep vast /graphite/configs/storage-schemas.conf >/dev/null 2>&1 \
   || sudo bash -c 'cat << EOF >> /graphite/configs/storage-schemas.conf
 [vast]
 pattern = ^vast\.
-retentions = 10s:24h,1m:90d
+retentions = 10s:48h,1m:120d,1h:3y
 EOF'
 
 docker restart $(docker ps | grep graphiteapp | awk '{print $1}')
@@ -71,13 +74,14 @@ Note that graphite is listening on port 8111 for its gui, you can change that ab
 #### Option 2b: on a bare-metal machine, with /opt/opsmon base for grafana, prometheus, and snmp_exporter
 ``` cd opsmon ; ./setup_grafana_prometheus_opt_opsmon ```
 
-After grafana is installed, go to http://localhost:3000  log in as admin,  and Go into gear_icon ->add datasource setting and put in the URL of the graphite instance, with localhost:8111 or whatever you might have changed it to. You sometimes can not use localhost:8111, you need real ip addr.
+After grafana is installed, go to http://localhost:3000  log in as admin,  change the password, and Go into gear_icon ->add datasource setting and put in the URL of the graphite instance, with localhost:8111 or whatever you might have changed it to. You sometimes can not use localhost:8111, you need real ip addr:8111.
 
-### Step 3: Install the supporting utilities. (jshon)
+### Step 3: Install the supporting utilities. (wget, bc, netcat, jshon)
 
 
 ```
-apt-get install -y nc wget curl 
+[[ -x /bin/rpm ]] && yum install -y nc bc wget curl 
+[[ -x /bin/apt ]] && apt-get install -y nc bc wget curl 
 cd API
 wget https://raw.githubusercontent.com/trmb-vast/api-tools/master/build_jshon
 bash ./build_jshon
@@ -96,11 +100,14 @@ Definition of Flags:
 ```
 
 ```
-* * * * * /home/vastdata/opsmon/API/get-vast-topn  -p $HOME/.ssh/vms_creds -c se-201 -v 10.61.10.201 -g 10.61.201.12 > /dev/null 2>&1
-#
+# VAST Rest API Metrics collectors. 
+* * * * * /home/vastdata/opsmon/API/get-vast-topn    -p $HOME/.ssh/vms_creds -c se-201 -v 10.61.10.201 -g 10.61.201.12 > /dev/null 2>&1
 * * * * * /home/vastdata/opsmon/API/get-vast-metrics -p $HOME/.ssh/vms_creds  -r 1 -r 2 -r 3 -r 4 -r 5 -r 8 -r 9 -r 15 -c se-201 -v 10.61.10.201 -g 10.61.201.12
+# The following require VAST-4.0 or newer to use the new capacity and IO flow reporting API .. in example below -r /scratch1 reports on that subdir. you can change it.
+#* * * * * /home/vastdata/opsmon/API/get-vast-capacity -p $HOME/.ssh/vms_creds -c -c se-202 -v 10.61.10.202 -g 10.61.201.12 -r /scratch1
+#* * * * * /home/vastdata/opsmon/API/get-vast-ioflow   -p $HOME/.ssh/vms_creds -c -c se-202 -v 10.61.10.202 -g 10.61.201.12
 ```
-Note:  You can get a **list of the Reports** (-r flag above) with the following:
+Note:  You can get a **list of the Reports** (-r flag above for get-vast-metrics) with the following:
 ```
 curl -u admin:######## -H "accept: application/json" --insecure -X GET "https://##.##.##.###/api/monitors/" | python3 -m json.tool   
 ```
