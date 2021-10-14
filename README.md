@@ -1,4 +1,5 @@
 # vast-api-scripts
+![Alt Text](https://uploads.vastdata.com/2020/04/logo.svg)
 Example Scripts to talk to VAST REST API
 
  These are informally supported by Rob@vastdata.com
