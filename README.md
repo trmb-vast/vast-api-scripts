@@ -116,11 +116,11 @@ that is not so expensive to retreive on a small cluster,  but a cluster with 32 
  you will find a monitoring dashboard in the grafana_dashboards subdir.
 
 
-#Appendix/Random examples
+### Appendix/Random examples
 
 #### Tip:   turn on Firefox (or Chrome) web-developer debugging to discover the REST calls/syntax while you browse the VMS Gui
 
-#### example 1. Retreive the current alarms from a cluster.
+#### Example 1. Retreive the current alarms from a cluster.
 note: check back in a week or so... This is getting added to the VAST/Grafana dashboard.
 ```
 [vastdata@selab-cb2-c1 API]$ curl -k https://$MGMT/api/alarms/ -u admin:#### | jq
@@ -154,3 +154,27 @@ note: check back in a week or so... This is getting added to the VAST/Grafana da
 ]
 
 ```
+
+#### Example 2. Retreive specific fields from the generic cluster dashboard page:
+``` 
+vastdata@opsmon-20:~$ curl -s -u ${VMS_USER}:${VMS_PASS} -k https://$VMS/api/clusters/?fields=psnt,name,leader_cnode,sw_version,build,ssd_raid_state,nvram_raid_state,memory_raid_state,upgrade_state,rd_iops,rd_latency_ms,rd_bw_mb  | jq
+[
+  {
+    "name": "selab-avnet-202",
+    "rd_iops": 0,
+    "rd_bw_mb": 0,
+    "rd_latency_ms": 0,
+    "sw_version": "4.0.0.57",
+    "build": "release-4.0.0-431685",
+    "leader_cnode": "cnode-16",
+    "ssd_raid_state": "HEALTHY",
+    "nvram_raid_state": "HEALTHY",
+    "memory_raid_state": "HEALTHY",
+    "upgrade_state": "DONE",
+    "psnt": "selab-avnet-202"
+  }
+]
+
+```
+
+
