@@ -110,9 +110,47 @@ curl -u admin:######## -H "accept: application/json" --insecure -X GET "https://
 ```
 
 Caution: Some of the reports are more expensive to retreive than others.. For example, report 10 and 11 are for NFS-RPC metrics.
-that is not so expensive to retreive,  but a cluster with 20 or 32 cnodes, you probably do not want to collect 10 second interval data for each cnode. (report 12 and 13)
+that is not so expensive to retreive on a small cluster,  but a cluster with 32 or 64 cnodes, you probably do not want to collect 10 second interval data for each cnode. (report 12 and 13)
 
 ### Step5:  Import JSON dashboards into Grafana
  you will find a monitoring dashboard in the grafana_dashboards subdir.
 
 
+#Appendix/Random examples
+
+#### Tip:   turn on Firefox (or Chrome) web-developer debugging to discover the REST calls/syntax while you browse the VMS Gui
+
+#### example 1. Retreive the current alarms from a cluster.
+note: check back in a week or so... This is getting added to the VAST/Grafana dashboard.
+```
+[vastdata@selab-cb2-c1 API]$ curl -k https://$MGMT/api/alarms/ -u admin:#### | jq
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100   684  100   684    0     0   1748      0 --:--:-- --:--:-- --:--:--  1749
+[
+  {
+    "id": 667,
+    "timestamp": "2021-10-14T20:56:54.989221Z",
+    "event": "https://##.##.10.202/api/events/209682/",
+    "event_definition": "https://##.##.10.202/api/eventdefinitions/95/",
+    "object_type": "ReplicationStream",
+    "object_id": 9,
+    "object_guid": "f9fe1e21-e316-4481-ab30-855b65bd81c1",
+    "object_name": "protectedpath",
+    "cluster": null,
+    "severity": "CRITICAL",
+    "alarm_message": "ProtectedPath protectedpath missed it's RPO target by 9 minutes, 20 seconds seconds",
+    "metadata": {
+      "internal": false,
+      "property": "ReplicationMetrics,rpo_offset",
+      "threshold": 124.58,
+      "object_name": "protectedpath",
+      "cluster_name": "selab-avnet-202"
+    },
+    "acknowledged": false,
+    "event_type": "THRESHOLD",
+    "event_name": "STREAM_CRITICAL_RPO_OFFSET"
+  }
+]
+
+```
