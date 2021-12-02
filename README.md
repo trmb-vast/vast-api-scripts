@@ -100,12 +100,12 @@ Definition of Flags:
 ```
 
 ```
-# VAST Rest API Metrics collectors. 
-* * * * * /home/vastdata/opsmon/API/get-vast-topn    -p $HOME/.ssh/vms_creds -c se-201 -v 10.61.10.201 -g 10.61.201.12 > /dev/null 2>&1
-* * * * * /home/vastdata/opsmon/API/get-vast-metrics -p $HOME/.ssh/vms_creds  -r 1 -r 2 -r 3 -r 4 -r 5 -r 8 -r 9 -r 15 -c se-201 -v 10.61.10.201 -g 10.61.201.12
+# VAST Rest API Metrics collectors.      note: vms_creds file should look like:  admin:<password>   
+* * * * * /home/vastdata/vast-api-scripts/API/get-vast-topn    -p $HOME/.ssh/vms_creds -c se-201 -v 10.61.10.201 -g 10.61.201.12 > /dev/null 2>&1
+* * * * * /home/vastdata/vast-api-scripts/API/get-vast-metrics -p $HOME/.ssh/vms_creds  -r 1 -r 2 -r 3 -r 4 -r 5 -r 8 -r 9 -r 15 -c se-201 -v 10.61.10.201 -g 10.61.201.12
 # The following require VAST-4.0 or newer to use the new capacity and IO flow reporting API .. in example below -r /scratch1 reports on that subdir. you can change it.
-#* * * * * /home/vastdata/opsmon/API/get-vast-capacity -p $HOME/.ssh/vms_creds -c -c se-202 -v 10.61.10.202 -g 10.61.201.12 -r /scratch1
-#* * * * * /home/vastdata/opsmon/API/get-vast-ioflow   -p $HOME/.ssh/vms_creds -c -c se-202 -v 10.61.10.202 -g 10.61.201.12
+#* * * * * /home/vastdata/vast-api-scripts/API/get-vast-capacity -p $HOME/.ssh/vms_creds -c se-202 -v 10.61.10.202 -g 10.61.201.12 -r /scratch1
+#* * * * * /home/vastdata/vast-api-scripts/API/get-vast-ioflow   -p $HOME/.ssh/vms_creds -c se-202 -v 10.61.10.202 -g 10.61.201.12
 ```
 Note:  You can get a **list of the Reports** (-r flag above for get-vast-metrics) with the following:
 ```
