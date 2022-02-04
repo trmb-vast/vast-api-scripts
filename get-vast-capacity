@@ -1,15 +1,16 @@
 #!/bin/bash
 #
 #  Vast metrics API scraper
-#  This is called from the vast-metrics-cron every 5 minutes
-#  it will pull the previous 10 minutes of metrics, and thus fill any holes.
-#  feel free to run it at 1 minute intervals via cron, like this:
-#* * * * * /opt/opsmon/API/get-vast-capacity -p $HOME/.ssh/vms_creds  \
+#  This is called from cron every 5 minutes. 
+#   change the args to match your site.
+# */5 * * * * /opt/opsmon/API/get-vast-capacity -p $HOME/.ssh/vms_creds  \
 #     -r /scratch1 -c se-202 -v 10.61.10.202 -g 10.61.201.12
 
 #  Author:  rob@vastdata.com
 #  Thu 14 Oct 2021 10:38:22 PM UTC rmallory .. first public release.
 #  Fri Sep  6 12:34:55 PDT 2019  rmallory .. adapted from metrics scraper.
+#  Tue 01 Feb 2022 01:27:47 AM UTC rmallory ., tuned up to deal with SMB filenames
+#  Tue 25 Jan 2022 01:48:58 AM UTC rmallory .. adapted from capacity scraper
 #
 # Notes: newer versions at:  https://github.com/trmb-vast/api-tools
 # dependencies: jshon   http://kmkeen.com/jshon/  (use my build_jshon script)
@@ -30,7 +31,7 @@ HOST=$(uname -n)
 test -x /usr/bin/rpm && NC="$(which nc) -w1" #some versions of netcat work better with -w1 arg.
 test -x /usr/bin/apt && NC="$(which nc) -w0" #some versions of netcat work quicker with -w0 arg.
 
-####### Fill out your variables here, or better yet, use commandline args
+####### Fill out your variables here, or better yet, use commandline args and it will override the below
 VMS=10.61.10.201 #IP of Vast management server
 VMSUSER=admin
 VMSPASS=xxx # change this or better yet use the -p flag below
@@ -84,9 +85,13 @@ echo CLUSTER: $CLUSTER
 
 ### reading credentials from a file (readable by this user, or with SUDO)
 ### is more safe than embedding passwords in scripts, or passing as args
+### format of file:    admin:<adminpass>
 if [ -f $CREDS_FILE ]; then
 	VMSUSER=$(cat $CREDS_FILE | cut -d: -f1)
 	VMSPASS=$(cat $CREDS_FILE | cut -d: -f2)
+else echo "Error: VMS credential file: $CREDS_FILE not found. "
+     echo "Error: you should create this or read the script: $0"
+     exit
 fi
 
 if [ "x" = "x${REPORTS}" ]; then
@@ -164,8 +169,8 @@ scrape_and_send_report() {
 	for x in $(seq 1 $NUMELEMENTS); do
 	$DEBUG && echo INFO: x is now $x
 
-		DIR=$($installdir/jshon -e details -e $x -e 0 <$JSON | sed 's/"//g' | tr ',' '.')
-		PARENT=$($installdir/jshon -e details -e $x -e 1 -e parent <$JSON | sed 's/"//g' | tr ',' '.')
+		DIR=$($installdir/jshon -e details -e $x -e 0 <$JSON | sed 's/"//g' | tr ',' '.' | tr ' ' '_' | tr '/' '.')
+		PARENT=$($installdir/jshon -e details -e $x -e 1 -e parent <$JSON | sed 's/"//g' | tr ',' '.' | tr ' ' '_' | tr '/' '.')
 		USEABLE=$($installdir/jshon -e details -e $x -e 1 -e data -e 0 <$JSON | sed 's/"//g' | tr ',' '.')
 		UNIQUE=$($installdir/jshon -e details -e $x -e 1 -e data -e 1 <$JSON | sed 's/"//g' | tr ',' '.')
 		LOGICAL=$($installdir/jshon -e details -e $x -e 1 -e data -e 2 <$JSON | sed 's/"//g' | tr ',' '.')
@@ -174,14 +179,6 @@ scrape_and_send_report() {
 #                DRR=$(echo "$UNIQUE / $LOGICAL" | bc -l) 
     if [ $PARENT = "/" ] ; then PARENT=/root ; fi
 
-		#echo vast.${CLUSTER}.capacity${PARENT}${DIR}.useable $USEABLE $NOW
-		#$DONTSEND || echo vast.${CLUSTER}.capacity${PARENT}${DIR}.useable $USEABLE $NOW | $NC $GRAPHITE_HOST ${GRAPHITE_PORT}
-		#echo vast.${CLUSTER}.capacity${PARENT}${DIR}.unique $UNIQUE $NOW
-		#$DONTSEND || echo vast.${CLUSTER}.capacity${PARENT}${DIR}.unique $UNIQUE $NOW | $NC $GRAPHITE_HOST ${GRAPHITE_PORT}
-		#echo vast.${CLUSTER}.capacity${PARENT}${DIR}.logical $LOGICAL $NOW
-		#$DONTSEND || echo vast.${CLUSTER}.capacity${PARENT}${DIR}.logical $LOGICAL $NOW | $NC $GRAPHITE_HOST ${GRAPHITE_PORT}
-		#echo vast.${CLUSTER}.capacity${PARENT}${DIR}.drr $DRR $NOW
-		#$DONTSEND || echo vast.${CLUSTER}.capacity${PARENT}${DIR}.drr $DRR $NOW | $NC $GRAPHITE_HOST ${GRAPHITE_PORT}
 		echo vast.${CLUSTER}.capacity${DIR}.useable $USEABLE $NOW
 		$DONTSEND || echo vast.${CLUSTER}.capacity${DIR}.useable $USEABLE $NOW | $NC $GRAPHITE_HOST ${GRAPHITE_PORT}
 		echo vast.${CLUSTER}.capacity${DIR}.unique $UNIQUE $NOW
@@ -194,6 +191,3 @@ scrape_and_send_report() {
 }
 
 scrape_and_send_report
-#for i in $REPORTS; do
-#	scrape_and_send_report $i
-#done
