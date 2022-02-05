@@ -22,11 +22,12 @@ git clone https://github.com/trmb-vast/vast-api-scripts.git
 * Access to a VAST cluster with admin or support credentials
 * An admin host with RAM, SSD, and Docker installed
 * Grafana instance (see below for quick docker setup)
-* Graphite instance (or see below for a quick intro)
+* Graphite instance (or see below for a quick docker setup)
 
 
 ### Instalation and Usage
-If you’ve manually compiled Graphite, then good for you. You probably then also know about go-carbon for higher performance. You should go check it out if you like graphite. 
+If you’ve manually compiled Graphite, then good for you, it can be a PITA.  You probably then also know about go-carbon for higher performance. You should go check it out if you like graphite. 
+for everyone else, the dockerhub version makes life simple.
 
 #### Step1: If you do not already have a Graphite server, then a quick, and mostly-production ready procedure is:  Install Graphite via a docker container:  https://hub.docker.com/r/graphiteapp/graphite-statsd/
 
@@ -54,11 +55,22 @@ set it up like shown below for high resolution for 48hrs and 1m for 120 days, an
 extend that if you like to multiple months or years but pay attention to the filesize it creates.
 
 ```
+echo "First cache some sudo credentials so the next command does not prompt for pw"
+sudo date  
 grep vast /graphite/configs/storage-schemas.conf >/dev/null 2>&1 \
   || sudo bash -c 'cat << EOF >> /graphite/configs/storage-schemas.conf
+[vast_capacity]
+pattern = ^vast\..*\.capacity\.
+retentions = 5m:7d,1h:30d,24h:10y
+
+[vast_quotas]
+pattern = ^vast\..*\.userquotas\.
+retentions = 5m:7d,1h:90d,24h:10y
+
 [vast]
 pattern = ^vast\.
-retentions = 10s:48h,1m:120d,1h:3y
+retentions = 10s:24h,1m:90d,30m:2y
+
 EOF'
 
 docker restart $(docker ps | grep graphiteapp | awk '{print $1}')
@@ -69,7 +81,7 @@ Note that graphite is listening on port 8111 for its gui, you can change that ab
 
 ### Step2: If not already installed, Install Grafana:  https://hub.docker.com/r/grafana/grafana/       
 
-#### Option 2a: via docker
+#### Option 2a: via docker  
 ```docker run -d --name=grafana -p 3000:3000 grafana/grafana ```
 #### Option 2b: on a bare-metal machine, with /opt/opsmon base for grafana, prometheus, and snmp_exporter
 ``` cd opsmon ; ./setup_grafana_prometheus_opt_opsmon ```
@@ -82,7 +94,6 @@ After grafana is installed, go to http://localhost:3000  log in as admin,  chang
 ```
 [[ -x /bin/rpm ]] && yum install -y nc bc wget curl 
 [[ -x /bin/apt ]] && apt-get install -y nc bc wget curl 
-cd API
 wget https://raw.githubusercontent.com/trmb-vast/api-tools/master/build_jshon
 bash ./build_jshon
 ```
@@ -92,8 +103,8 @@ bash ./build_jshon
 
 Definition of Flags:
 ```
--p file with user:pass of vms user
--c clustername>
+-p path to file containing:    user:pass of vms user
+-c <clustername>
 -v vms IP address
 -g graphite host IP address
 -r report#  -r <report#>   ... a list of reports to retreive and push into graphite
@@ -101,11 +112,13 @@ Definition of Flags:
 
 ```
 # VAST Rest API Metrics collectors.      note: vms_creds file should look like:  admin:<password>   
-* * * * * /home/vastdata/vast-api-scripts/API/get-vast-topn    -p $HOME/.ssh/vms_creds -c se-201 -v 10.61.10.201 -g 10.61.201.12 > /dev/null 2>&1
-* * * * * /home/vastdata/vast-api-scripts/API/get-vast-metrics -p $HOME/.ssh/vms_creds  -r 1 -r 2 -r 3 -r 4 -r 5 -r 8 -r 9 -r 15 -c se-201 -v 10.61.10.201 -g 10.61.201.12
+# Also Change the homedir/path  and the -c <clustername>  and -v <vmsIP>   -g <graphitehost>
+# don't forget the >/dev/null 2>&1 , else this user will get email every minute.
+* * * * * /home/vastdata/vast-api-scripts/get-vast-topn    -p $HOME/.ssh/vms_creds -c se-201 -v 10.61.10.201 -g 10.61.201.12 > /dev/null 2>&1
+* * * * * /home/vastdata/vast-api-scripts/get-vast-metrics -p $HOME/.ssh/vms_creds  -r 1 -r 2 -r 3 -r 4 -r 5 -r 8 -r 9 -r 15 -c se-201 -v 10.61.10.201 -g 10.61.201.12 > /dev/null 2>&1
 # The following require VAST-4.0 or newer to use the new capacity and IO flow reporting API .. in example below -r /scratch1 reports on that subdir. you can change it.
-#* * * * * /home/vastdata/vast-api-scripts/API/get-vast-capacity -p $HOME/.ssh/vms_creds -c se-202 -v 10.61.10.202 -g 10.61.201.12 -r /scratch1
-#* * * * * /home/vastdata/vast-api-scripts/API/get-vast-ioflow   -p $HOME/.ssh/vms_creds -c se-202 -v 10.61.10.202 -g 10.61.201.12
+#* * * * * /home/vastdata/vast-api-scripts/get-vast-capacity -p $HOME/.ssh/vms_creds -c se-201 -v 10.61.10.201 -g 10.61.201.12 -r /scratch1 > /dev/null 2>&1
+#* * * * * /home/vastdata/vast-api-scripts/get-vast-ioflow   -p $HOME/.ssh/vms_creds -c se-201 -v 10.61.10.201 -g 10.61.201.12 > /dev/null 2>&1
 ```
 Note:  You can get a **list of the Reports** (-r flag above for get-vast-metrics) with the following:
 ```
