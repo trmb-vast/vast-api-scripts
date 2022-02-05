@@ -46,12 +46,11 @@ GRAPHITE_HOST=10.61.201.12 #IP of Graphite host
 GRAPHITE_PORT=2003         #Graphite listener port
 
 usage() {
-	echo "Usage: $0 -p <credentialfile> -g <graphite host> -c <cluster> -v <vms name/ip>  "
+	echo "Usage: $0 -r <directoryname> -p <credentialfile>   -g <graphite host>   -c <cluster>  -v <vms name/ip>  "
 	echo "     a script to retreive JSON metrics from the VAST API and push to Graphite"
-	echo " the required -r <report>  is the VAST metric ID. ..multiple -r <report> are fine."
+	echo "-r is not optional. eg:  -r /   for the root,   -r /scratch1 to report on the /scratch1 subdir. "
 	echo "-p <credentialfile> is a file with user:pass  of vms user to run queries as. chmod go-rwx it as needed"
-	echo "use the -D flag to prevent sending to the -g Graphite host. or dont pass -g "
-	echo "-r is not optional.. -r /   for the root,   -r /scratch1 to report on the /scratch1 subdir. "
+	echo "use the -D (dryrun) flag to prevent sending to the -g Graphite host. or dont pass -g "
 	echo "Note: this query only drills down 3 levels deep, thus the -r flag to get deeper or more granular."
 }
 
@@ -67,7 +66,7 @@ while getopts r:p:c:g:v:r:dDh c; do
 		if [ -n "${OPTARG}" ]; then
 			REPORTS="${OPTARG}/"
 		else
-			end_die "Invalid report list supplied"
+			end_die "Invalid directory supplied"
 		fi
 		;;
 	v) VMS="${OPTARG}" ;;
@@ -134,7 +133,7 @@ scrape_and_send_report() {
 	echo "...Calling VAST API for report $1 with curl"
 	#curl -u ${VMSUSER}:${VMSPASS} -H "accept: application/json" --insecure -X GET "https://$VMS/api/capacity/?granularity=seconds&amp;aggregation=avg&amp;format_data=true" >$JSON
 	#curl -u ${VMSUSER}:${VMSPASS} -H "accept: application/json" --insecure -X GET "https://$VMS/api/capacity/" | python3 -m json.tool >$JSON
-	curl -u ${VMSUSER}:${VMSPASS} -H "accept: application/json" --insecure -X GET "https://$VMS/api/capacity/?path=$REPORTS" | python3 -m json.tool >$JSON
+	curl -u ${VMSUSER}:${VMSPASS} -H "accept: application/json" --insecure -X GET "https://$VMS/api/capacity/?path=$REPORTS"  >$JSON
 
 	NUMELEMENTS="$($installdir/jshon -e details -l <$JSON)"
 	echo NUMELEMENTS=$NUMELEMENTS
@@ -161,9 +160,11 @@ scrape_and_send_report() {
 	#average_atime
 
 	# step1)  get the timestamp of this json sample  .. we use this throughout.. we could use average_atime also.
-	TIMESTAMP=$($installdir/jshon -e time <$JSON)
-	TIMESTAMP=$(echo $TIMESTAMP | sed 's/"//g')
-	NOW=$(/usr/bin/date -d "$TIMESTAMP" +%s)
+	# actually, for this script, at this time we dont have timestamp data. so just use date +%s
+	#TIMESTAMP=$($installdir/jshon -e time <$JSON)
+	#TIMESTAMP=$(echo $TIMESTAMP | sed 's/"//g')
+        #NOW=$(/usr/bin/date -d "$TIMESTAMP" +%s)
+        NOW=$(/usr/bin/date +%s)
 
 	# step2) for each of the samples
 	for x in $(seq 1 $NUMELEMENTS); do
