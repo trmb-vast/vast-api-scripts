@@ -10,11 +10,15 @@
 # its probably still a good idea to run graphite in a docker.
 #
 
+# XXX Todo:   need to create a backup and upgrade strategy
+#   -- grafana, prometheus, and graphite have data and conf directories
+#      which you can sysctl stop,  change a symlink, rsync over the data/conf old to new, sysctl start
+
 installdir=$(cd $(dirname $0);pwd)
 
 # From time to time you have to update the below URLS to latest
-URL_GRAFANA="https://dl.grafana.com/oss/release/grafana-8.1.2.linux-amd64.tar.gz"
-URL_PROMETHEUS="https://github.com/prometheus/prometheus/releases/download/v2.28.1/prometheus-2.28.1.linux-amd64.tar.gz"
+URL_GRAFANA="https://dl.grafana.com/oss/release/grafana-8.3.4.linux-amd64.tar.gz"
+URL_PROMETHEUS="https://github.com/prometheus/prometheus/releases/download/v2.33.1/prometheus-2.33.1.linux-amd64.tar.gz"
 URL_SNMP_EXPORTER="https://github.com/prometheus/snmp_exporter/releases/download/v0.20.0/snmp_exporter-0.20.0.linux-amd64.tar.gz"
 
 echo "##################################################################"
@@ -207,8 +211,13 @@ do echo Info:  systemctl start $i
    echo "Info: you can run:  systemctl status $i"
 done
 
-echo Warning:
-echo "To finish up the config:"
+echo "Info: Grafana is now installed in /opt/opsmon, and started with systemd."
+echo "Info: Graphite was also setup as a docker container. the VAST API scripts scrape and push into graphite."
+echo "Info: Prometheus is also installed, but that is optional, and only used for SNMP switch monitoring and client monitoring."
+echo "To enable Grafana dashboards for VAST, you can later import the dashboards via your web browser from:"
+echo "https://github.com/trmb-vast/vast-api-scripts/tree/main/grafana_dashboards"
+echo ""
+echo "If you want to monitor switches, or clients with prometheus,"
 echo "add various exporters to prometheus as seen in the diff below."
 echo "diff opsmon_prometheus.yml /opt/opsmon/prometheus/prometheus.yml"
 echo "sudo vi /opt/opsmon/prometheus/prometheus.yml  and edit SNMP device IP addrs"
@@ -216,7 +225,6 @@ echo "sudo systemctl restart prometheus"
 echo
 echo "Go into grafana and add datasource: prometheus with http://localhost:9090" 
 echo "You want to import these dashboards into grafana for SNMP:   12492  12489  11169 10523"
-echo "And also import the dashboards from https://github.com/trmb-vast/vast-api-scripts/tree/main/grafana_dashboards"
 echo 
-echo "If you would like 20 second interval snmp stats from the mellanox switches, change the prometheus.yml file,"
+echo "Optionally, If you would like 20 second interval snmp stats (normally 1 minute) from the mellanox switches, change the prometheus.yml file,"
 echo "and enable 20 second SNMP intervals on MLX switches:  conf t ; snmp-server auto-refresh interval 20"
