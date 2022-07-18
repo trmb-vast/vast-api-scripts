@@ -28,10 +28,10 @@ installdir=$(
 PATH=/bin:/usr/bin:/usr/sbin:$installdir
 HOST=$(uname -n)
 
-test -x /usr/bin/rpm && NC="$(which nc) -w1" #some versions of netcat work better with -w1 arg.
 test -x /usr/bin/apt && NC="$(which nc) -w0" #some versions of netcat work quicker with -w0 arg.
+test -x /usr/bin/rpm && NC="$(which nc) -w1" #some versions of netcat work better with -w1 arg.
 
-####### Fill out your variables here, or better yet, use commandline args and it will override the below
+####### Fill out your variables here, or better yet---> USE commandline args and it will override the below
 VMS=10.61.10.201 #IP of Vast management server
 VMSUSER=admin
 VMSPASS=xxx # change this or better yet use the -p flag below
@@ -104,7 +104,7 @@ fi
 
 ####
 # Each curl/report goes to a different named file in /tmp
-JSON=/tmp/vmsdata_capacity_${CLUSTER}_$(echo $1 | tr ' ' '_').json
+JSON=/tmp/vmsdata_capacity_${CLUSTER}_$(echo $1 | tr ' ' '_' )_$(echo ${REPORTS} | tr '/' '_').json
 rm -f $JSON
 ####
 
