@@ -51,31 +51,54 @@ Important: You need to create those directories/filesystems and have enough spac
  
  
 Read up on how to change the **storage_schemas.conf**. 
-set it up like shown below for high resolution for 48hrs and 1m for 120 days, and 1hour averages to to 3 years.
+set it up like shown below for high resolution for 48hrs and 1m for 120 days, and 1hour averages to to 2 years.
 extend that if you like to multiple months or years but pay attention to the filesize it creates.
+The schemas file is order-dependent also, so make sure the default is at the bottom.
 
 ```
 echo "First cache some sudo credentials so the next command does not prompt for pw"
 sudo date  
 grep vast /graphite/configs/storage-schemas.conf >/dev/null 2>&1 \
-  || sudo bash -c 'cat << EOF >> /graphite/configs/storage-schemas.conf
+  || sudo bash -c 'cat << EOF > /graphite/configs/storage-schemas.conf
+# Carbon's internal metrics. This entry should match what is specified in
+# CARBON_METRIC_PREFIX and CARBON_METRIC_INTERVAL settings
+# many VAST performance metrics are in 5-second intervals 
+# But here we only create buckets for 10-second intervals
+# If you want to use more space in your graphite whisper files.. Go for it!
+# Note: this file is order dependent... 
+[carbon]
+pattern = ^carbon\.
+retentions = 10s:6h,1m:90d
+
 [vast_capacity]
 pattern = ^vast\..*\.capacity\.
-retentions = 5m:7d,1h:30d,24h:10y
+retentions = 10m:7d,1h:30d,30d:10y
 
 [vast_quotas]
 pattern = ^vast\..*\.userquotas\.
-retentions = 5m:7d,1h:90d,24h:10y
+retentions = 10m:7d,1h:30d,30d:10y
 
 [vast]
 pattern = ^vast\.
 retentions = 10s:24h,1m:90d,30m:2y
 
+[default_1min_for_6days]
+pattern = .*
+retentions = 10s:6h,1m:6d,10m:1800d
 EOF'
 
 docker restart $(docker ps | grep graphiteapp | awk '{print $1}')
 
 ```
+
+#### Some other useful commands to check on the effective retention schemas:
+```
+docker exec -it `docker ps -q --filter name=graphite` /bin/sh
+
+/opt/graphite/bin/whisper-info.py $(ls /opt/graphite/storage/whisper/vast/*/capacity/*/unique.wsp | tail -1)
+```
+
+
 Note that graphite is listening on port 8111 for its gui, you can change that above if you like, but match it to the port number when you setup datasource in grafana
 
 
