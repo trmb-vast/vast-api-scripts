@@ -44,7 +44,7 @@ echo CLUSTER: $CLUSTER
 ### if you don't want to use the -g <graphitehost> flag, then set here
 GRAPHITE_HOST=10.61.201.12 #IP of Graphite host
 GRAPHITE_PORT=2003         #Graphite listener port
-DEBUG=false
+
 
 usage() {
 	echo "Usage: $0 -p <credentialfile> -g <graphite host> -c <cluster> -v <vms name/ip>  "
@@ -55,7 +55,7 @@ usage() {
 }
 
 DONTSEND=false
-DEBUG=false
+DEBUG=${DEBUG:-false}
 
 while getopts r:p:c:g:v:r:d:Dh c; do
 	case "$c" in
@@ -134,7 +134,15 @@ scrape_and_send_report() {
 
 	echo "...Calling VAST API for report $1 with curl"
 	#curl -u ${VMSUSER}:${VMSPASS} -H "accept: application/json" --insecure -X GET "https://$VMS/api/monitors/${1}/query/?granularity=seconds&amp;aggregation=avg&amp;format_data=true" | python3 -m json.tool >$JSON
-	curl -u ${VMSUSER}:${VMSPASS} -H "accept: application/json" --insecure -X GET "https://$VMS/api/monitors/${1}/query/?granularity=seconds&amp;aggregation=avg&amp;format_data=true" >$JSON
+	#curl -u ${VMSUSER}:${VMSPASS} -H "accept: application/json" --insecure -X GET "https://$VMS/api/monitors/${1}/query/?granularity=seconds&amp;aggregation=avg&amp;format_data=true" >$JSON
+	$DEBUG && echo "Setting time_frame=75s   .. this will return only the last 75 seconds of values.. "
+	$DEBUG %% echo "(the extra 15 seconds s to cover holes in a previous iteration which might have a couple missing values) this is good if you run it once per minute"
+	$DEBUG && echo "if you want to run once every 5 minutes, then read the code and flip the commented/uncommened lines."
+	if [ -n "$(find $JSON -mtime +2 2>/dev/null)" ]  ; then  echo "$JSON file found to be more than 2 minutes old.. if you are sampling every 5 mins, read the code in $0" ; fi
+	$DEBUG && set -x
+	curl -u ${VMSUSER}:${VMSPASS} -H "accept: application/json" --insecure -X GET "https://$VMS/api/monitors/${1}/query/?granularity=seconds&amp;time_frame=75s&amp;aggregation=avg&amp;format_data=true" >$JSON
+	#curl -u ${VMSUSER}:${VMSPASS} -H "accept: application/json" --insecure -X GET "https://$VMS/api/monitors/${1}/query/?granularity=minutes&amp;time_frame=20m&amp;aggregation=avg&amp;format_data=true" >$JSON    ### If you run a cron every 5 minutes, and want to collect 5 minute granularity samples, then use this and comment out the previous one. 
+	$DEBUG && set +x
 
 	NUMELEMENTS="$($installdir/jshon -l <$JSON)"
 	#NUMELEMENTS=$((NUMELEMENTS-1)) ## we used to do this when we ignored timestamp
