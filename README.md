@@ -10,9 +10,11 @@ Example Scripts to talk to VAST REST API
  you can use it as is, or as an example to re-do in any framework, programming language, tsdb of your chosing.
 
  To make it simple to configure, it is run from cron once per minute,  yes, sometimes metrics are not yet ready, so there are "holes"
- in your most recent data, but VAST api returns all entries of the last 10 minutes, and graphite will
- blatantly overwrite similar data and fill in any holes.
- but yes, your grafana page lags by a minute. this is similar to other collectors.
+ in your most recent data, but VAST api returns all entries of the last 75 seconds, and graphite will
+ blatantly overwrite similar data and back-fill in any holes.
+ Yes, your grafana page lags by a minute. this is similar to other collectors.
+ If you want to poll only every 5, or even 15 minutes, with 5minute granularity, then read the code... easy to change.
+ Many metrics return with 5-second granularity. the default storage-schemas.conf is setup for 10 second. Change it to 5 second if you would like larger whisper files with the benefit of higher-resolution data providers for grafana. Might want to double-check your grafana pages there also.
 
 ### Where to get
 git clone https://github.com/trmb-vast/vast-api-scripts.git
@@ -28,6 +30,7 @@ git clone https://github.com/trmb-vast/vast-api-scripts.git
 ### Instalation and Usage
 If you’ve manually compiled Graphite, then good for you, it can be a PITA.  You probably then also know about go-carbon for higher performance. You should go check it out if you like graphite. 
 for everyone else, the dockerhub version makes life simple.
+
 
 #### Step1: If you do not already have a Graphite server, then a quick, and mostly-production ready procedure is:  Install Graphite via a docker container:  https://hub.docker.com/r/graphiteapp/graphite-statsd/
 
@@ -218,7 +221,11 @@ vastdata@opsmon-20:~$ curl -s -u ${VMS_USER}:${VMS_PASS} -k https://$VMS/api/clu
     "psnt": "selab-avnet-202"
   }
 ]
+```
+#### Example 3. Retreive the capacity under path=/scratch1
 
+```
+curl -u ${VMSUSER}:${VMSPASS} -H 'accept: application/json' --insecure -X GET 'https://${VMS}/api/capacity/?path=/scratch1/'
 ```
 
 
