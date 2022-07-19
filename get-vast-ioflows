@@ -2,7 +2,7 @@
 #
 #  get-vast-ioflows:   a script to scrape the VAST rest API and save io flow data to graphite
 #
-# 
+#
 
 #  Author:  rob@vastdata.com
 #  Thu 14 Oct 2021 10:35:35 PM UTC rmallory .. initial public release.
@@ -101,14 +101,14 @@ scrape_and_send_report() {
 	$DEBUG && set -x
 
 	echo "...Calling VAST API for report $1 with curl"
-        curl -u ${VMSUSER}:${VMSPASS} -H "accept: application/json" --insecure -X GET "https://$VMS/api/iodata/?graph=true&results_num=100&sort_by=bw&sort_type=total&limit=20&protocol_filter=NFS3"  | python3 -m json.tool >$JSON
-#       curl -u admin:#### -H 'accept: application/json' --insecure -X GET 'https://192.168.10.209/api/iodata/?graph=true&results_num=100&sort_by=bw&sort_type=total&limit=20&protocol_filter=NFS3' 
-#curl 'https://192.168.10.209/api/iodata/?graph=true&results_num=100&sort_by=bw&sort_type=total&limit=20&protocol_filter=NFS3' -H 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:92.0) Gecko/20100101 Firefox/92.0' -H 'Accept: application/json, text/plain, */*' -H 'Accept-Language: en-US,en;q=0.5' --compressed -H 'Content-Type: application/json' -H 'Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNjMyNTIxNDY2LCJqdGkiOiI5YzZhYmEzNDA1MzE0NWJlODQ4NzRiZWE1MTNmNDY2NCIsInVzZXJfaWQiOjJ9.qP1i286ALhlZr1DZVVU6kewLalohbeeMcEEipnDidDA' -H 'Connection: keep-alive' -H 'Referer: https://192.168.10.209/' -H 'Sec-Fetch-Dest: empty' -H 'Sec-Fetch-Mode: cors' -H 'Sec-Fetch-Site: same-origin' -H 'TE: trailers'
+	curl -u ${VMSUSER}:${VMSPASS} -H "accept: application/json" --insecure -X GET "https://$VMS/api/iodata/?graph=true&results_num=100&sort_by=bw&sort_type=total&limit=20&protocol_filter=NFS3" | python3 -m json.tool >$JSON
+	#       curl -u admin:#### -H 'accept: application/json' --insecure -X GET 'https://192.168.10.209/api/iodata/?graph=true&results_num=100&sort_by=bw&sort_type=total&limit=20&protocol_filter=NFS3'
+	#curl 'https://192.168.10.209/api/iodata/?graph=true&results_num=100&sort_by=bw&sort_type=total&limit=20&protocol_filter=NFS3' -H 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:92.0) Gecko/20100101 Firefox/92.0' -H 'Accept: application/json, text/plain, */*' -H 'Accept-Language: en-US,en;q=0.5' --compressed -H 'Content-Type: application/json' -H 'Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNjMyNTIxNDY2LCJqdGkiOiI5YzZhYmEzNDA1MzE0NWJlODQ4NzRiZWE1MTNmNDY2NCIsInVzZXJfaWQiOjJ9.qP1i286ALhlZr1DZVVU6kewLalohbeeMcEEipnDidDA' -H 'Connection: keep-alive' -H 'Referer: https://192.168.10.209/' -H 'Sec-Fetch-Dest: empty' -H 'Sec-Fetch-Mode: cors' -H 'Sec-Fetch-Site: same-origin' -H 'TE: trailers'
 
-#	NUMELEMENTS="$($installdir/jshon -e $TOP_ARRAY -l <$JSON)"
-#	NUMELEMENTS="$($installdir/jshon -e nodes_data -l <$JSON)"
-TOP_ARRAY=connections
-TOP_ARRAY=nodes_data
+	#	NUMELEMENTS="$($installdir/jshon -e $TOP_ARRAY -l <$JSON)"
+	#	NUMELEMENTS="$($installdir/jshon -e nodes_data -l <$JSON)"
+	TOP_ARRAY=connections
+	TOP_ARRAY=nodes_data
 	NUMELEMENTS="$($installdir/jshon -e $TOP_ARRAY -l <$JSON)"
 	echo NUMELEMENTS=$NUMELEMENTS
 
@@ -122,8 +122,9 @@ TOP_ARRAY=nodes_data
 	#]   # Note.. this is pretty cool.. we can derive the DRR  from logical / unique
 	# The below just gets the keys names.. as seen above. we call them ELE_NAME
 	#for i in $(seq 1 $KEYS_NUM); do
-	for i in $($installdir/jshon -e $TOP_ARRAY -k <$JSON | tr '\n' ' ')
-		ELE_NAME[$i]=$($installdir/jshon -e $TOP_ARRAY -e $i <$JSON | sed 's/"//g' | awk -F= '{print $NF}' | tr ',' '.')
+	for i in $($installdir/jshon -e $TOP_ARRAY -k <$JSON | tr '\n' ' '); do
+		#ELE_NAME[$i]=$($installdir/jshon -e $TOP_ARRAY -e $i <$JSON | sed 's/"//g' | awk -F= '{print $NF}' | tr ',' '.')
+		ELE_NAME[$i]=$($installdir/jshon -e $TOP_ARRAY -e $i <$JSON | tr -d '\"' | awk -F= '{print $NF}' | tr ',' '.')
 		echo "Hmm.. would send $i with value ELE_NAME[$i]"
 	done
 
@@ -143,17 +144,44 @@ TOP_ARRAY=nodes_data
 
 	# step2) for each of the samples
 	for x in $(seq 1 $NUMELEMENTS); do
-	$DEBUG && echo INFO: x is now $x
+		$DEBUG && echo INFO: x is now $x
 
 		DIR=$($installdir/jshon -e $TOP_ARRAY -e $x -e 0 <$JSON | sed 's/"//g' | tr ',' '.')
 		PARENT=$($installdir/jshon -e $TOP_ARRAY -e $x -e 1 -e parent <$JSON | sed 's/"//g' | tr ',' '.')
 		USEABLE=$($installdir/jshon -e $TOP_ARRAY -e $x -e 1 -e data -e 0 <$JSON | sed 's/"//g' | tr ',' '.')
 		UNIQUE=$($installdir/jshon -e $TOP_ARRAY -e $x -e 1 -e data -e 1 <$JSON | sed 's/"//g' | tr ',' '.')
 		LOGICAL=$($installdir/jshon -e $TOP_ARRAY -e $x -e 1 -e data -e 2 <$JSON | sed 's/"//g' | tr ',' '.')
-# Hmm..  I think we have a bug.. or Im mis-interpriting the meaning .. I had to flip-flop these
-                DRR=$(echo "$USEABLE / $UNIQUE" | bc -l) 
-#                DRR=$(echo "$UNIQUE / $LOGICAL" | bc -l) 
-    if [ $PARENT = "/" ] ; then PARENT=/root ; fi
+		# Hmm..  I think we have a bug.. or Im mis-interpriting the meaning .. I had to flip-flop these
+		DRR=$(echo "$USEABLE / $UNIQUE" | bc -l)
+		#                DRR=$(echo "$UNIQUE / $LOGICAL" | bc -l)
+		if [ $PARENT = "/" ]; then PARENT=/root; fi
+
+
+        "vippool": {
+            "main": {
+                "host": [
+                    "172.200.5.135",
+                    "172.200.5.137"
+                ],
+                "vip": [
+                    "172.200.203.1",
+                    "172.200.203.7"
+                ],
+                "cnode": [
+                    "cnode-3-40",
+                    "cnode-3-38"
+                ],
+                "view": [
+                    "/veeambeta/backups/avnet203",
+                    "/scratch1 (/scratch1)"
+                ],
+                "user": [
+                    "(root) 0",
+                    "(nfsnobody) 65534"
+                ]
+            }
+
+
 
 		#echo vast.${CLUSTER}.capacity${PARENT}${DIR}.useable $USEABLE $NOW
 		#$DONTSEND || echo vast.${CLUSTER}.capacity${PARENT}${DIR}.useable $USEABLE $NOW | $NC $GRAPHITE_HOST ${GRAPHITE_PORT}
