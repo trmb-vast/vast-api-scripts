@@ -23,9 +23,15 @@ git clone https://github.com/trmb-vast/vast-api-scripts.git
 ### Prerequisites:
 * Access to a VAST cluster with admin or support credentials
 * An admin host with RAM, SSD, and Docker installed
-* Grafana instance (see below for quick docker setup)
-* Graphite instance (or see below for a quick docker setup)
+*   or a VM:  RHEL or Ubuntu.  32GB RAM, 4 vcpus, 70GB boot disk, 1TB or more Data disk. (mounted as /graphite)
+* Grafana instance  (see below for a quick docker setup)
+* Graphite instance (see below for a quick docker setup)
 
+### Optional: 
+* Prometheus (for VAST exporter, and  or node-exporter) 
+* Vast-exporter: https://github.com/vast-data/vast-exporter     #see section below
+* Node-exporter: https://github.com/prometheus/node_exporter
+* patched-node-exporter: https://github.com/trmb-vast/node_exporter   #NFSoRDMA support here for an older node_exporter XXX need to update, contact rob.
 
 ### Instalation and Usage
 If you’ve manually compiled Graphite, then good for you, it can be a PITA.  You probably then also know about go-carbon for higher performance. You should go check it out if you like graphite. 
@@ -161,6 +167,11 @@ that is not so expensive to retreive on a small cluster,  but a cluster with 32 
 
 ### Step5:  Import JSON dashboards into Grafana
  you will find a monitoring dashboard in the grafana_dashboards subdir.
+
+### Step6:  Setup vast-exporter for prometheus (this will be Step-1 someday soon)
+vast-exporter is here: https://github.com/vast-data/vast-exporter
+it runs in a docker container and exports the most common metrics, to be scraped by prometheus.
+...more docs to come...
 
 
 ### Appendix/Random examples
