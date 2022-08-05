@@ -27,8 +27,9 @@ installdir=$(
 PATH=/bin:/usr/bin:/usr/sbin:$installdir
 HOST=$(uname -n)
 
-NC="$(which nc) -w1" #some versions of netcat work better with -w1 arg.
-NC="$(which nc) -w0" #some versions of netcat work quicker with -w0 arg.
+test -x /usr/bin/apt && NC="$(which nc) -w0" #some versions of netcat work quicker with -w0 arg.
+test -x /usr/bin/rpm && NC="$(which nc) -w1" #some versions of netcat work better with -w1 arg.
+
 
 ####### Fill out your variables here
 VMS=10.61.10.201 #IP of Vast management server
