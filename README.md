@@ -143,7 +143,8 @@ Definition of Flags:
 ```
 
 ```
-# VAST Rest API Metrics collectors.      note: vms_creds file should look like:  admin:<password>   
+# VAST Rest API Metrics collectors.      
+# note: vms_creds file at $HOME/.ssh/vms_creds  should have contents:  admin:<password>   
 # Also Change the homedir/path  and the -c <clustername>  and -v <vmsIP>   -g <graphitehost>
 # don't forget the >/dev/null 2>&1 , else this user will get email every minute.
 * * * * * /home/vastdata/vast-api-scripts/get-vast-topn    -p $HOME/.ssh/vms_creds -c se-201 -v 10.61.10.201 -g 10.61.201.12 > /dev/null 2>&1
@@ -160,6 +161,11 @@ Note:  You can get a **list of the Metrics** (and a mapping of their fqn (fully 
 
 ```
 curl -u admin:######## -H "accept: application/json" --insecure -X GET "https://##.##.##.###/api/metrics/" | python3 -m json.tool   
+```
+
+Note: Another way You can get a ** list of the Metrics** (and a mapping of their fqn (fully qualified name, or internal name)  to Title:
+```
+curl -u admin:######## -H "accept: application/json" --insecure -X GET "https://##.##.##.###/api/fqndata/?fields=title" | jq
 ```
 
 Caution: Some of the reports are more expensive to retreive than others.. For example, report 10 and 11 are for NFS-RPC metrics.
