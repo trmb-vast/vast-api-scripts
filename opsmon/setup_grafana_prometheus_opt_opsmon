@@ -17,9 +17,11 @@
 installdir=$(cd $(dirname $0);pwd)
 
 # From time to time you have to update the below URLS to latest
-URL_GRAFANA="https://dl.grafana.com/oss/release/grafana-8.5.9.linux-amd64.tar.gz"
-URL_PROMETHEUS="https://github.com/prometheus/prometheus/releases/download/v2.37.0/prometheus-2.37.0.linux-amd64.tar.gz"
+URL_GRAFANA="https://dl.grafana.com/oss/release/grafana-9.4.7.linux-amd64.tar.gz"
+#URL_GRAFANA="https://dl.grafana.com/oss/release/grafana-9.3.0.linux-amd64.tar.gz"
+URL_PROMETHEUS="https://github.com/prometheus/prometheus/releases/download/v2.43.0/prometheus-2.43.0.linux-amd64.tar.gz"
 URL_SNMP_EXPORTER="https://github.com/prometheus/snmp_exporter/releases/download/v0.20.0/snmp_exporter-0.20.0.linux-amd64.tar.gz"
+
 
 echo "##################################################################"
 echo "## WARNING: This script will make a new directory /opt/opsmon "
@@ -83,6 +85,36 @@ echo ln -s $MYVERS $SHORTDIRNAME
 get_and_extract  $URL_GRAFANA
 get_and_extract  $URL_PROMETHEUS
 get_and_extract  $URL_SNMP_EXPORTER
+
+### Cleanup grafana
+
+cd /opt/opsmon/grafana/conf
+if [ -f server.key ]
+then echo "server.key exists.. exiting"
+	exit
+else
+
+   #rm server.*
+   cd /opt/opsmon/grafana/conf
+   openssl genrsa -des3 -passout pass:sillypassword -out server.pass.key 2048
+   openssl rsa -passin pass:sillypassword -in server.pass.key -out server.key
+   rm server.pass.key
+
+#   openssl req -new -key server.key -out server.csr \
+#     -subj "/C=US/ST=California/L=San Diego/O=VastData/OU=APCOE Department/CN=opsmon.sli.vastdata.com"
+#New way to include the IP address for AltName
+   openssl req -x509 -nodes -days 3650 -newkey rsa:2048 -sha256 \
+	   -subj '/C=US/ST=California/L=San Diego/O=VastData/OU=APCOE Department/CN=opsmon.sli.vastdata.com/subjectAltName=DNS.1=10.61.201.12/' \
+	   -keyout server.key -out server.crt
+
+# Now sign it with our own
+   openssl x509 -req -days 3650 -in server.csr -signkey server.key -out server.crt
+
+   chown grafana /opt/opsmon/grafana/conf/server.key /opt/opsmon/grafana/conf/server.crt /opt/opsmon/grafana/conf/server.csr
+   #chown -R grafana /local/mnt/grafana/var
+fi
+
+
 
 
 echo "############# installing systemd startup files"
