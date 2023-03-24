@@ -2,7 +2,13 @@
 ![Alt Text](https://uploads.vastdata.com/2020/04/logo.svg)
 Example Scripts to talk to VAST REST API
 
- These are primarily supported by Rob at vastdata.com
+ These are primarily supported by Rob at vastdata.com and provided under the beer-ware license.
+
+ VAST 4.5 (Dec 2022) and newer have an on-cluster Prometheus exporter! you should start with that! (we do have a grafana_dashboard for that here) ((step 6))
+ This repo contains stuff which is still useful and some things the prometheus exporter can't do (storage estimates).
+ this repo has some other scripts and dashboards to monitor other related stuff like client, and network switches.
+ so yes, I'm going to continue to informally maintain it in my spare time. feel free to file issues or pull requests!
+ ...
 
  There is a ton of end-user-preferences around which TSDB and what language to write it in.
 
@@ -16,7 +22,10 @@ Example Scripts to talk to VAST REST API
  If you want to poll only every 5, or even 15 minutes, with 5minute granularity, then read the code... easy to change.
  Many metrics return with 5-second granularity. the default storage-schemas.conf is setup for 10 second. Change it to 5 second if you would like larger whisper files with the benefit of higher-resolution data providers for grafana. Might want to double-check your grafana pages there also.
 
-### Where to get
+### But I'm looking for the VAST python interface instead of this...
+git clone https://github.com/vast-data/vastpy
+
+### Where to get this
 git clone https://github.com/trmb-vast/vast-api-scripts.git
 
 
@@ -124,9 +133,11 @@ After grafana is installed, go to http://localhost:3000  log in as admin,  chang
 
 
 ```
-[[ -x /bin/rpm ]] && yum install -y nc bc wget curl 
-[[ -x /bin/apt ]] && apt-get install -y nc bc wget curl 
-wget https://raw.githubusercontent.com/trmb-vast/api-tools/master/build_jshon
+[[ -x /bin/rpm ]] && yum install -y nc bc wget curl python3
+[[ -x /bin/rpm ]] && yum groupinstall -y "Development Tools"
+[[ -x /bin/apt ]] && apt-get install -y nc bc wget curl python3
+[[ -x /bin/apt ]] && apt-get install build-essentials
+wget https://raw.githubusercontent.com/trmb-vast/vast-api-scripts/main/build_jshon
 bash ./build_jshon
 ```
 
@@ -148,6 +159,7 @@ Definition of Flags:
 # Also Change the homedir/path  and the -c <clustername>  and -v <vmsIP>   -g <graphitehost>
 # don't forget the >/dev/null 2>&1 , else this user will get email every minute.
 * * * * * /home/vastdata/vast-api-scripts/get-vast-topn    -p $HOME/.ssh/vms_creds -c se-201 -v 10.61.10.201 -g 10.61.201.12 > /dev/null 2>&1
+# the -r 1 -r 2 -r 3 ... are the metric-reports 
 * * * * * /home/vastdata/vast-api-scripts/get-vast-metrics -p $HOME/.ssh/vms_creds  -r 1 -r 2 -r 3 -r 4 -r 5 -r 8 -r 9 -r 15 -c se-201 -v 10.61.10.201 -g 10.61.201.12 > /dev/null 2>&1
 # The following require VAST-4.0 or newer to use the new capacity and IO flow reporting API .. in example below -r /scratch1 reports on that subdir. you can change it.
 #* * * * * /home/vastdata/vast-api-scripts/get-vast-capacity -p $HOME/.ssh/vms_creds -c se-201 -v 10.61.10.201 -g 10.61.201.12 -r /scratch1 > /dev/null 2>&1
@@ -173,12 +185,29 @@ that is not so expensive to retreive on a small cluster,  but a cluster with 32 
 
 ### Step5:  Import JSON dashboards into Grafana
  you will find a monitoring dashboard in the grafana_dashboards subdir.
+ including the *new* VAST_cluster_stats_vast_exporter.json to be used with the on-board Prometheus exporter !
 
 ### Step6:  Setup vast-exporter for prometheus (this will be Step-1 someday soon)
 vast-exporter is here: https://github.com/vast-data/vast-exporter
 it runs in a docker container and exports the most common metrics, to be scraped by prometheus.
-...more docs to come...
 
+OR: use the built-in prometheus vast_exporter as seen below.
+if you need to setup grafana, and promehteus easily, use the opsmon/setup_grafana_prometheus_opt_opsmon script!
+```
+   #Add the following to prometheus.yml changing where needed
+   #New builtin prometheus vast_exporter with 4.5
+  - job_name: 'vast'
+    scheme: https
+    scrape_interval: 10s
+    metrics_path: '/api/prometheusmetrics/'
+    static_configs:
+        - targets: ['10.61.10.202:443']
+    basic_auth:
+       username: 'admin'
+       password: ‘xxxxxx'
+    tls_config:
+        insecure_skip_verify: true
+```
 
 ### Appendix/Random examples
 
