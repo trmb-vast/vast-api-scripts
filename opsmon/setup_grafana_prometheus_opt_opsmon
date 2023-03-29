@@ -1,9 +1,18 @@
 #!/bin/bash
 
 # Robs script to install prometheus, grafana, snmp_exporter
-# it also sets up RHEL or Ubuntu systemd startup scripts.
+# This just makes your life easier than manual install.
+#
+# it also makes it easy to do updates to grafana, prometheus 
+# by simply untaring the latest,  copying any /data or /var
+# from the old to the new, and then changing the /opt/opsmon/grafana symlink
+# to point to the new. 
+#
+# This script sets up RHEL or Ubuntu systemd startup scripts.
 # Note:  /opt/opsmon  is where the binaries, config, and database live
-# last update:  Thu Aug  5 21:31:05 UTC 2021
+# normally this is on a seperate partition (unlike /usr/local) 
+# which won't fill up / partition.
+# last update:  Tue 28 Mar 2023 11:22:51 PM UTC
 #
 # This will build a static host install.. 
 # Not using docker containers for those listed above.
@@ -59,6 +68,10 @@ echo "######### Downloading and installing grafana and prometheus"
 #set -x
 mkdir -p /opt/opsmon
 cd /opt/opsmon
+echo "########  Info:  See below, it is recommended to have this on a seperate partition ###"
+echo "########         so when /opt/opsmon/prometheus/data fills up, it won't fill up /  ###"
+df -k /opt/opsmon
+echo "######################################################################################"
 
 get_and_extract(){
 MYURL=$1
@@ -211,6 +224,19 @@ cat >>/opt/opsmon/prometheus/prometheus.yml<<EOF
         target_label: instance
       - target_label: __address__
         replacement: 127.0.0.1:9116  # The SNMP exporter's real hostname:port.
+#New builtin prometheus vast_exporter with 4.5  
+# Change the IP addr, the username and password below.
+  - job_name: 'vast'
+    scheme: https
+    scrape_interval: 10s
+    metrics_path: '/api/prometheusmetrics/'
+    static_configs:
+        - targets: ['10.61.10.202:443']
+    basic_auth:
+       username: 'admin'
+       password: 'xxxxxx'
+    tls_config:
+        insecure_skip_verify: true
 EOF
 
 
@@ -247,7 +273,7 @@ echo "Info: Grafana is now installed in /opt/opsmon, and started with systemd."
 echo "Info: Graphite was also setup as a docker container. the VAST API scripts scrape and push into graphite."
 echo "Info: Prometheus is also installed, but that is optional, and only used for SNMP switch monitoring and client monitoring."
 echo "To enable Grafana dashboards for VAST, you can later import the dashboards via your web browser from:"
-echo "https://github.com/trmb-vast/vast-api-scripts/tree/main/grafana_dashboards"
+echo "https://github.com/trmb-vast/vast-api-scripts/tree/main/grafana_dashboards    or id 18377 from grafana.com"
 echo ""
 echo "If you want to monitor switches, or clients with prometheus,"
 echo "add various exporters to prometheus as seen in the diff below."
@@ -256,6 +282,7 @@ echo "sudo vi /opt/opsmon/prometheus/prometheus.yml  and edit SNMP device IP add
 echo "sudo systemctl restart prometheus"
 echo
 echo "Go into grafana and add datasource: prometheus with http://localhost:9090" 
+echo "You want to import these dashboards into grafana for VAST:   18377"
 echo "You want to import these dashboards into grafana for SNMP:   12492  12489  11169 10523"
 echo 
 echo "Optionally, If you would like 20 second interval snmp stats (normally 1 minute) from the mellanox switches, change the prometheus.yml file,"

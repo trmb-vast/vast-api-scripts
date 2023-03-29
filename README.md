@@ -4,7 +4,7 @@ Example Scripts to talk to VAST REST API
 
  These are primarily supported by Rob at vastdata.com and provided under the beer-ware license.
 
- VAST 4.5 (Dec 2022) and newer have an on-cluster Prometheus exporter! you should start with that! (we do have a grafana_dashboard for that here) ((step 6))
+ VAST 4.5 (Dec 2022) and newer have an on-cluster Prometheus exporter! you should start with that! (we do have a grafana_dashboard for that here) ((Step5))
  This repo contains stuff which is still useful and some things the prometheus exporter can't do (storage estimates).
  this repo has some other scripts and dashboards to monitor other related stuff like client, and network switches.
  so yes, I'm going to continue to informally maintain it in my spare time. feel free to file issues or pull requests!
@@ -186,6 +186,7 @@ that is not so expensive to retreive on a small cluster,  but a cluster with 32 
 ### Step5:  Import JSON dashboards into Grafana
  you will find a monitoring dashboard in the grafana_dashboards subdir.
  including the *new* VAST_cluster_stats_vast_exporter.json to be used with the on-board Prometheus exporter !
+ https://grafana.com/grafana/dashboards/18377-vast-cluster-stats-vast-exporter/
 
 ### Step6:  Setup vast-exporter for prometheus (this will be Step-1 someday soon)
 vast-exporter is here: https://github.com/vast-data/vast-exporter
