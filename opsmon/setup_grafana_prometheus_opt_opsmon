@@ -27,9 +27,10 @@ installdir=$(cd $(dirname $0);pwd)
 
 # From time to time you have to update the below URLS to latest
 URL_GRAFANA="https://dl.grafana.com/oss/release/grafana-9.4.7.linux-amd64.tar.gz"
-#URL_GRAFANA="https://dl.grafana.com/oss/release/grafana-9.3.0.linux-amd64.tar.gz"
-URL_PROMETHEUS="https://github.com/prometheus/prometheus/releases/download/v2.43.0/prometheus-2.43.0.linux-amd64.tar.gz"
-URL_SNMP_EXPORTER="https://github.com/prometheus/snmp_exporter/releases/download/v0.20.0/snmp_exporter-0.20.0.linux-amd64.tar.gz"
+URL_GRAFANA="https://dl.grafana.com/oss/release/grafana-10.1.1.linux-amd64.tar.gz"
+
+URL_PROMETHEUS="https://github.com/prometheus/prometheus/releases/download/v2.47.0/prometheus-2.47.0.linux-amd64.tar.gz"
+URL_SNMP_EXPORTER="https://github.com/prometheus/snmp_exporter/releases/download/v0.24.1/snmp_exporter-0.24.1.linux-amd64.tar.gz"
 
 
 echo "##################################################################"
